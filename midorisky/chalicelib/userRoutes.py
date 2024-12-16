@@ -7,11 +7,10 @@ user_routes = Blueprint(__name__)
 idp_client = boto3.client('cognito-idp')
 ssm_client = boto3.client('ssm')
 
+pool_id = ssm_client.get_parameter(Name='/midori/user_pool_id', WithDecryption=True)['Parameter']['Value']
 
-@user_routes.route('/admin/users', authorizer=admin_authorizer)
+@user_routes.route('/admin/users', authorizer=admin_authorizer, cors=True)
 def get_users():
-    pool_id = ssm_client.get_parameter(Name='/midori/user_pool_id', WithDecryption=True)['Parameter']['Value']
-
     users = idp_client.list_users(
         UserPoolId=pool_id,
         AttributesToGet=[

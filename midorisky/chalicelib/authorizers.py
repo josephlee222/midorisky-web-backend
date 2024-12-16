@@ -68,10 +68,29 @@ def admin_authorizer(auth_request):
         return AuthResponse(routes=[], principal_id='user')
 
     # Return the AuthResponse with user context
-    return AuthResponse(routes=['*'], principal_id=decoded_token['sub'],
-                        context={'username': decoded_token.get('username'),
-                                 'groups': user_groups})
+    return AuthResponse(routes=['*'], principal_id=decoded_token['sub'])
 
+
+@auth_functions.authorizer()
+def farmer_manager_authorizer(auth_request):
+    """Authorizer to validate JWT tokens and check user group membership."""
+    token = auth_request.token
+    if not token:
+        raise UnauthorizedError("Missing authorization token")
+
+    try:
+        # Decode and validate the JWT
+        decoded_token = decode_jwt(token)
+    except UnauthorizedError as e:
+        return AuthResponse(routes=[], principal_id='user')
+
+    # Check if the user belongs to the required group
+    user_groups = decoded_token.get('cognito:groups', [])  # Ensure 'groups' is part of your token payload
+    if "Admin" not in user_groups and "FarmManager" not in user_groups:
+        return AuthResponse(routes=[], principal_id='user')
+
+    # Return the AuthResponse with user context
+    return AuthResponse(routes=['*'], principal_id=decoded_token['sub'])
 
 @auth_functions.authorizer()
 def farmer_authorizer(auth_request):
@@ -92,6 +111,4 @@ def farmer_authorizer(auth_request):
         return AuthResponse(routes=[], principal_id='user')
 
     # Return the AuthResponse with user context
-    return AuthResponse(routes=['*'], principal_id=decoded_token['sub'],
-                        context={'username': decoded_token.get('username'),
-                                 'groups': user_groups})
+    return AuthResponse(routes=['*'], principal_id=decoded_token['sub'])

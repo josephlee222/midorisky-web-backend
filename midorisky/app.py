@@ -2,22 +2,25 @@ from chalice import Chalice
 from chalicelib.userRoutes import user_routes
 from chalicelib.farmRoutes import farm_routes
 from chalicelib.authorizers import auth_functions, admin_authorizer
-
-
+import os
 
 app = Chalice(app_name='midorisky')
 app.register_blueprint(user_routes)
 app.register_blueprint(farm_routes)
 app.register_blueprint(auth_functions)
 
-
-@app.route('/')
+@app.route('/', cors=True)
 def index():
     return {'message': 'Hello world, from MidoriSKY!'}
 
-@app.route('/test/admin', authorizer=admin_authorizer)
+@app.route('/test/admin', authorizer=admin_authorizer, cors=True)
 def test_admin():
     return {'message': 'You have access to admin routes!'}
+
+@app.route('/test/env', cors=True)
+def test_env():
+    test = os.environ.get('TEST')
+    return {'message': test}
 
 
 # The view function above will return {"hello": "world"}
