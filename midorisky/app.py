@@ -1,7 +1,7 @@
 from chalice import Chalice
 from chalicelib.userRoutes import user_routes
 from chalicelib.farmRoutes import farm_routes
-from chalicelib.authorizers import auth_functions, admin_authorizer
+from chalicelib.authorizers import auth_functions, admin_authorizer, farmer_manager_authorizer
 import os
 
 app = Chalice(app_name='midorisky')
@@ -16,6 +16,10 @@ def index():
 @app.route('/test/admin', authorizer=admin_authorizer, cors=True)
 def test_admin():
     return {'message': 'You have access to admin routes!'}
+
+@app.route('/test/admin', authorizer=farmer_manager_authorizer, cors=True)
+def test_admin():
+    return {'message': 'You have access to farm manager routes!'}
 
 @app.route('/test/env', cors=True)
 def test_env():
