@@ -18,7 +18,7 @@ def test_admin():
     return {'message': 'You have access to admin routes!'}
 
 @app.route('/test/farmer', authorizer=farmer_authorizer, cors=True)
-def test_admin():
+def test_farmer():
     return {'message': 'You have access to farm routes!'}
 
 @app.route('/test/env', cors=True)
