@@ -1,12 +1,14 @@
 from chalice import Chalice
 from chalicelib.userRoutes import user_routes
 from chalicelib.farmRoutes import farm_routes
+from chalicelib.taskRoutes import task_routes
 from chalicelib.authorizers import auth_functions, admin_authorizer, farmer_authorizer
 import os
 
 app = Chalice(app_name='midorisky')
 app.register_blueprint(user_routes)
 app.register_blueprint(farm_routes)
+app.register_blueprint(task_routes)
 app.register_blueprint(auth_functions)
 
 @app.route('/', cors=True)

@@ -68,11 +68,11 @@ def admin_authorizer(auth_request):
         return AuthResponse(routes=[], principal_id='user')
 
     # Return the AuthResponse with user context
-    return AuthResponse(routes=['*'], principal_id=decoded_token['sub'])
+    return AuthResponse(routes=['*'], principal_id=decoded_token['username'])
 
 
 @auth_functions.authorizer()
-def farmer_manager_authorizer(auth_request):
+def farm_manager_authorizer(auth_request):
     """Authorizer to validate JWT tokens and check user group membership."""
     token = auth_request.token
     if not token:
@@ -90,7 +90,7 @@ def farmer_manager_authorizer(auth_request):
         return AuthResponse(routes=[], principal_id='user')
 
     # Return the AuthResponse with user context
-    return AuthResponse(routes=['*'], principal_id=decoded_token['sub'])
+    return AuthResponse(routes=['*'], principal_id=decoded_token['username'])
 
 @auth_functions.authorizer()
 def farmer_authorizer(auth_request):
@@ -111,4 +111,4 @@ def farmer_authorizer(auth_request):
         return AuthResponse(routes=[], principal_id='user')
 
     # Return the AuthResponse with user context
-    return AuthResponse(routes=['*'], principal_id=decoded_token['sub'])
+    return AuthResponse(routes=['*'], principal_id=decoded_token['username'])
