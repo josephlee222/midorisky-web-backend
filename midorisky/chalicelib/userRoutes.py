@@ -1,7 +1,7 @@
 from chalice import Blueprint, BadRequestError
 import boto3
 import json
-from .authorizers import admin_authorizer
+from .authorizers import admin_authorizer, farmer_authorizer
 from strgen import StringGenerator as SG
 
 user_routes = Blueprint(__name__)
@@ -38,6 +38,30 @@ def get_users():
 
 @user_routes.route('/admin/users/{username}', authorizer=admin_authorizer, cors=True, methods=['GET'])
 def get_user(username):
+    user = idp_client.admin_get_user(
+        UserPoolId=pool_id,
+        Username=username
+    )
+
+    user_groups = idp_client.admin_list_groups_for_user(
+        Username=username,
+        UserPoolId=pool_id
+    )["Groups"]
+
+    output_user = {"username": user["Username"], "create_at": user["UserCreateDate"],
+                   "modified_at": user["UserLastModifiedDate"], "enabled": user["Enabled"],
+                   "user_status": user["UserStatus"]}
+
+    for a in user["UserAttributes"]:
+        output_user[a["Name"]] = a["Value"]
+
+    output_user["groups"] = [group["GroupName"] for group in user_groups]
+
+    return json.loads(json.dumps(output_user, default=str))
+
+# Normal permissions
+@user_routes.route('/users/{username}', authorizer=farmer_authorizer, cors=True, methods=['GET'])
+def get_user_normal(username):
     user = idp_client.admin_get_user(
         UserPoolId=pool_id,
         Username=username
