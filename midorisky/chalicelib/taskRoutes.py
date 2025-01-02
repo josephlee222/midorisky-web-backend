@@ -68,3 +68,35 @@ def get_task(id):
         assigneeResult = cursor.fetchall()
 
         return json.loads(json.dumps({'task': taskResult, 'assignees': assigneeResult}, default=str))
+
+
+@task_routes.route('/tasks/{id}', authorizer=farmer_authorizer, cors=True, methods=['DELETE'])
+def delete_task(id):
+    sql = "DELETE FROM Tasks WHERE id = %s"
+    connection.ping(reconnect=True)
+
+    with connection.cursor() as cursor:
+        cursor.execute(sql, id)
+        connection.commit()
+
+        return {"message": "Task deleted successfully!"}
+
+
+@task_routes.route('/tasks', authorizer=farm_manager_authorizer, cors=True, methods=['POST'])
+def create_task():
+    request = task_routes.current_request
+    body = request.json_body
+
+    title = body["title"]
+    description = body["description"]
+    priority = body["priority"]
+
+
+    sql = "INSERT INTO Tasks (title, description, priority, created_by) VALUES (%s, %s, %s, %s)"
+
+    connection.ping(reconnect=True)
+    with connection.cursor() as cursor:
+        cursor.execute(sql, (title, description, priority, task_routes.current_request.context['authorizer']['principalId']))
+        connection.commit()
+        return {"message": "Task created successfully!"}
+
