@@ -21,7 +21,7 @@ def get_all_tasks(display):
                     GROUP BY ta.taskId
                 ) ta_count ON t.id = ta_count.taskId
                 LEFT JOIN TasksAssignees AS ta ON t.id = ta.taskId
-                WHERE ta.username = %s
+                WHERE ta.username = %s AND t.hidden = 0
                 GROUP BY t.id, t.title, t.description, t.created_at, t.updated_at, t.created_by, t.status
                 ORDER BY t.priority ASC
             """
@@ -29,10 +29,26 @@ def get_all_tasks(display):
         sql = "SELECT t.id, t.title, t.description, t.created_at, t.updated_at, t.created_by, t.status, t.priority, count(ta.id) as users_assigned FROM Tasks as t LEFT JOIN TasksAssignees AS ta ON t.id = ta.taskId GROUP BY t.id, t.title, t.description, t.created_at, t.updated_at, t.created_by, t.status ORDER BY t.priority ASC"
     elif display == 'hidden':
         sql = "SELECT t.id, t.title, t.description, t.created_at, t.updated_at, t.created_by, t.status, t.priority, count(ta.id) as users_assigned FROM Tasks as t LEFT JOIN TasksAssignees AS ta ON t.id = ta.taskId WHERE t.hidden = 0 GROUP BY t.id, t.title, t.description, t.created_at, t.updated_at, t.created_by, t.status ORDER BY t.priority ASC"
+    elif display == 'outstanding':
+        sql = """
+            SELECT t.id, t.title, t.description, t.created_at, t.updated_at, t.created_by, t.status, t.priority,
+                   COALESCE(ta_count.users_assigned, 0) as users_assigned
+            FROM Tasks as t
+            LEFT JOIN (
+                SELECT ta.taskId, COUNT(ta.id) as users_assigned
+                FROM TasksAssignees AS ta
+                GROUP BY ta.taskId
+            ) ta_count ON t.id = ta_count.taskId
+            LEFT JOIN TasksAssignees AS ta ON t.id = ta.taskId
+            WHERE ta.username = %s AND t.hidden = 0 AND t.status = 1
+            GROUP BY t.id, t.title, t.description, t.created_at, t.updated_at, t.created_by, t.status
+            ORDER BY t.priority ASC
+            LIMIT 3;
+        """
 
     connection.ping(reconnect=True)
     with connection.cursor() as cursor:
-        if display == 'my':
+        if display == 'my' or display == 'outstanding':
             cursor.execute(sql, task_routes.current_request.context['authorizer']['principalId'])
         else:
             cursor.execute(sql)
