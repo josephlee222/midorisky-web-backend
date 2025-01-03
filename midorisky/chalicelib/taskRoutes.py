@@ -1,20 +1,10 @@
 from chalice import Blueprint
 import boto3
 from .authorizers import farmer_authorizer, farm_manager_authorizer
-import pymysql
+from .connectHelper import connection
 import json
 
 task_routes = Blueprint(__name__)
-ssm_client = boto3.client('ssm')
-
-# RDS connection details from environment variables
-HOST = ssm_client.get_parameter(Name='/midori/rds_host', WithDecryption=True)['Parameter']['Value']
-USER = ssm_client.get_parameter(Name='/midori/rds_user', WithDecryption=True)['Parameter']['Value']
-PASSWORD = ssm_client.get_parameter(Name='/midori/rds_password', WithDecryption=True)['Parameter']['Value']
-DB_NAME = ssm_client.get_parameter(Name='/midori/db_name', WithDecryption=True)['Parameter']['Value']
-
-connection = pymysql.connect(host=HOST, user=USER, password=PASSWORD, database=DB_NAME, charset='utf8mb4',
-                                 cursorclass=pymysql.cursors.DictCursor)
 
 # Get all tasks from the database
 @task_routes.route('/tasks/list/{display}', authorizer=farm_manager_authorizer, cors=True)

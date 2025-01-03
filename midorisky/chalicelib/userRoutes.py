@@ -1,3 +1,4 @@
+import os
 from chalice import Blueprint, BadRequestError
 import boto3
 import json
@@ -6,9 +7,8 @@ from strgen import StringGenerator as SG
 
 user_routes = Blueprint(__name__)
 idp_client = boto3.client('cognito-idp')
-ssm_client = boto3.client('ssm')
 
-pool_id = ssm_client.get_parameter(Name='/midori/user_pool_id', WithDecryption=True)['Parameter']['Value']
+pool_id = os.environ.get('USER_POOL_ID')
 
 @user_routes.route('/admin/users', authorizer=admin_authorizer, cors=True, methods=['GET'])
 def get_users():
