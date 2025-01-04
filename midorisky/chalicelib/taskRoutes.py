@@ -1,7 +1,7 @@
-from chalice import Blueprint
+from chalice import Blueprint, BadRequestError
 import boto3
 from .authorizers import farmer_authorizer, farm_manager_authorizer
-from .connectHelper import connection
+from .connectHelper import create_connection
 import json
 
 task_routes = Blueprint(__name__)
@@ -46,13 +46,11 @@ def get_all_tasks(display):
             LIMIT 3;
         """
 
-    connection.ping(reconnect=True)
-    with connection.cursor() as cursor:
+    with create_connection().cursor() as cursor:
         if display == 'my' or display == 'outstanding':
             cursor.execute(sql, task_routes.current_request.context['authorizer']['principalId'])
         else:
             cursor.execute(sql)
-        connection.commit()
 
         result = cursor.fetchall()
         return json.loads(json.dumps(result, default=str))
@@ -62,31 +60,62 @@ def get_all_tasks(display):
 def get_task(id):
     sql = "SELECT t.id, t.title, t.description, t.created_at, t.updated_at, t.created_by, t.status, t.priority, t.hidden, count(ta.id) as users_assigned FROM Tasks as t LEFT JOIN TasksAssignees AS ta ON t.id = ta.taskId WHERE t.id = %s GROUP BY t.id, t.title, t.description, t.created_at, t.updated_at, t.created_by, t.status"
     assignee_sql = "SELECT username, email FROM TasksAssignees WHERE taskId = %s"
-    connection.ping(reconnect=True)
 
-    with connection.cursor() as cursor:
+    with create_connection().cursor() as cursor:
         cursor.execute(sql, id)
-        connection.commit()
         taskResult = cursor.fetchone()
 
         cursor.execute(assignee_sql, id)
-        connection.commit()
         assigneeResult = cursor.fetchall()
 
         return json.loads(json.dumps({'task': taskResult, 'assignees': assigneeResult}, default=str))
 
 
-@task_routes.route('/tasks/{id}', authorizer=farmer_authorizer, cors=True, methods=['DELETE'])
+@task_routes.route('/tasks/{id}', authorizer=farm_manager_authorizer, cors=True, methods=['DELETE'])
 def delete_task(id):
     sql = "DELETE FROM Tasks WHERE id = %s"
-    connection.ping(reconnect=True)
 
-    with connection.cursor() as cursor:
+    with create_connection().cursor() as cursor:
         cursor.execute(sql, id)
-        connection.commit()
-
         return {"message": "Task deleted successfully!"}
 
+@task_routes.route('/tasks/{id}', authorizer=farm_manager_authorizer, cors=True, methods=['PUT'])
+def edit_task(id):
+    request = task_routes.current_request
+    body = request.json_body
+
+    title = body["title"]
+    description = body["description"]
+    priority = body["priority"]
+
+    # Dynamically build the SQL query
+    sql = "UPDATE Tasks SET "
+    if title:
+        sql += "title = %s, "
+    if description:
+        sql += "description = %s, "
+    if priority:
+        sql += "priority = %s, "
+
+    sql = sql[:-2] + " WHERE id = %s"
+
+    # Dynamically build the parameters
+    params = []
+    if title:
+        params.append(title)
+    if description:
+        params.append(description)
+    if priority:
+        params.append(priority)
+
+    params.append(id)
+
+    try:
+        with create_connection().cursor() as cursor:
+            cursor.execute(sql, params)
+            return {"message": "Task updated successfully!"}
+    except Exception as e:
+        return BadRequestError(str(e))
 
 @task_routes.route('/tasks', authorizer=farm_manager_authorizer, cors=True, methods=['POST'])
 def create_task():
@@ -97,12 +126,9 @@ def create_task():
     description = body["description"]
     priority = body["priority"]
 
-
     sql = "INSERT INTO Tasks (title, description, priority, created_by) VALUES (%s, %s, %s, %s)"
 
-    connection.ping(reconnect=True)
-    with connection.cursor() as cursor:
+    with create_connection().cursor() as cursor:
         cursor.execute(sql, (title, description, priority, task_routes.current_request.context['authorizer']['principalId']))
-        connection.commit()
         return {"message": "Task created successfully!"}
 
