@@ -33,6 +33,12 @@
       "Action": "logs:*",
       "Effect": "Allow",
       "Resource": "*"
+    },
+    {
+      "Sid": "Stmt1736093014200",
+      "Action": "s3:*",
+      "Effect": "Allow",
+      "Resource": "*"
     }
   ]
 }
