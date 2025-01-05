@@ -2,8 +2,9 @@ from chalice import UnauthorizedError, AuthResponse, Blueprint
 import requests
 import jwt
 from jwt.algorithms import RSAAlgorithm
+import os
 
-JWKS_URL = 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_cgJgNBs7M/.well-known/jwks.json'
+JWKS_URL = 'https://cognito-idp.' + os.environ.get('REGION') + '.amazonaws.com/' + os.environ.get('USER_POOL_ID') + '/.well-known/jwks.json'
 JWT_ALGORITHM = 'RS256'  # Or RS256 if using a public/private key pair
 auth_functions = Blueprint(__name__)
 # Cache for JWKS keys

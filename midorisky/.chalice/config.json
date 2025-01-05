@@ -3,7 +3,8 @@
   "app_name": "midorisky",
   "environment_variables": {
     "TEST": "test_value",
-    "USER_POOL_ID": "us-east-1_cgJgNBs7M"
+    "USER_POOL_ID": "us-east-1_cgJgNBs7M",
+    "REGION": "us-east-1"
   },
   "automatic_layer": true,
   "stages": {
