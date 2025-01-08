@@ -7,6 +7,7 @@
     "REGION": "us-east-1"
   },
   "automatic_layer": true,
+  "lambda_memory_size": 1024,
   "stages": {
     "dev": {
       "api_gateway_stage": "api",
