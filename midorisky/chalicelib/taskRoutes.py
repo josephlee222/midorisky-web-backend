@@ -2,6 +2,7 @@ from chalice import Blueprint, BadRequestError, ForbiddenError, Response
 import boto3
 from .authorizers import farmer_authorizer, farm_manager_authorizer
 from .connectHelper import create_connection
+from .notificationService import create_notification
 import json
 
 task_routes = Blueprint(__name__)
@@ -98,12 +99,18 @@ def edit_task(id):
     sql = sql[:-2] + " WHERE id = %s"
     params.append(id)
 
+    getSql = "SELECT * FROM Tasks WHERE id = %s"
+
     try:
         with create_connection().cursor() as cursor:
             cursor.execute(sql, params)
+            cursor.execute(getSql, id)
+            task = cursor.fetchone()
+            create_notification("task", id, "Task Updated", "A task has been updated. Please check the task for more details.\n\nTask Details:\nTitle: " + task['title'] + "\nDescription: " + task['description'])
+
             return {"message": "Task updated successfully!"}
     except Exception as e:
-        return BadRequestError(str(e))
+        raise BadRequestError(str(e))
 
 
 @task_routes.route('/tasks/{id}/status', authorizer=farmer_authorizer, cors=True, methods=['PUT'])
