@@ -2,6 +2,8 @@ from chalice import Chalice
 from chalicelib.userRoutes import user_routes
 from chalicelib.farmRoutes import farm_routes
 from chalicelib.taskRoutes import task_routes
+from chalicelib.weatherRoutes import weather_routes
+from chalicelib.deviceRoutes import device_routes
 from chalicelib.authorizers import auth_functions, admin_authorizer, farmer_authorizer
 import os
 
@@ -10,6 +12,8 @@ app.register_blueprint(user_routes)
 app.register_blueprint(farm_routes)
 app.register_blueprint(task_routes)
 app.register_blueprint(auth_functions)
+app.register_blueprint(weather_routes)
+app.register_blueprint(device_routes)
 
 @app.route('/', cors=True)
 def index():
@@ -27,6 +31,10 @@ def test_farmer():
 def test_env():
     test = os.environ.get('TEST')
     return {'message': test}
+
+@app.route('/test/weather', cors=True)
+def test_weather():
+    return {'message': 'You have access to weather routes!'}
 
 
 # The view function above will return {"hello": "world"}
