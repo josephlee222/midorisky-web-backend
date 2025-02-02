@@ -1,12 +1,23 @@
 from chalice import Blueprint, Response, BadRequestError
 import boto3
-import pandas as pd
 import json
+from datetime import datetime, timedelta
 from .connectHelper import create_connection
 
 weather_routes = Blueprint(__name__)
 
 s3 = boto3.client('s3')
+
+def format_daily_data(result, columns):
+    """
+    Format daily data from the database result.
+    """
+    data = []
+    for row in result:
+        row_dict = dict(zip(columns, row))
+        row_dict['timestamp'] = row_dict['timestamp'].strftime('%Y-%m-%d') if 'timestamp' in row_dict else row_dict['Date'].strftime('%Y-%m-%d')
+        data.append(row_dict)
+    return data
 
 @weather_routes.route('/staff/weather/fetch-weather-data', methods=['GET'], cors=True)
 def fetch_weather_data():
@@ -28,37 +39,12 @@ def fetch_weather_data():
         if not result:
             raise BadRequestError("No data found for the specified period.")
 
-        # Convert the result to a DataFrame
-        df = pd.DataFrame(result, columns=['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed'])
-
-        # Process the data: format daily data
-        df['timestamp'] = pd.to_datetime(df['timestamp'])  # Ensure timestamps are in datetime format
-        df['date'] = df['timestamp'].dt.date  # Extract the date
-
-        daily_data = df.groupby('date').agg({
-            'temperature': 'mean',
-            'humidity': 'mean',
-            'precipitation': 'sum',  # Total precipitation per day
-            'windspeed': 'mean'
-        }).reset_index()
-
-        # Rename columns to match React's expected format
-        daily_data = daily_data.rename(columns={
-            'date': 'Date',
-            'temperature': 'Avg_Temperature',
-            'humidity': 'Avg_Humidity',
-            'precipitation': 'Avg_Precipitation',
-            'windspeed': 'Avg_Windspeed'
-        })
-
-        # Serialize the date to a string format
-        daily_data['Date'] = daily_data['Date'].astype(str)
-
-        # Convert DataFrame to JSON format
-        weather_data_json = daily_data.to_dict(orient='records')
+        # Format the data
+        columns = ['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed']
+        weather_data = format_daily_data(result, columns)
 
         return Response(
-            body=json.dumps(weather_data_json),
+            body=json.dumps(weather_data),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
@@ -96,37 +82,12 @@ def fetch_predicted_weather_data():
         if not result:
             raise BadRequestError("No data found for the specified period.")
 
-        # Convert the result to a DataFrame
-        df = pd.DataFrame(result, columns=['Date', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed'])
-
-        # Process the data: ensure Date is in the correct format
-        df['Date'] = pd.to_datetime(df['Date']).dt.date  # Convert Date to a proper date object if needed
-
-        # Aggregate data (in this case, it is already daily, but this ensures consistency)
-        daily_data = df.groupby('Date').agg({
-            'Temperature': 'mean',      # Average temperature
-            'Humidity': 'mean',         # Average humidity
-            'Precipitation': 'sum',     # Total precipitation per day
-            'Windspeed': 'mean'         # Average windspeed
-        }).reset_index()
-
-        # Rename columns to match React's expected format
-        daily_data = daily_data.rename(columns={
-            'Date': 'Date',
-            'Temperature': 'Avg_Temperature',
-            'Humidity': 'Avg_Humidity',
-            'Precipitation': 'Avg_Precipitation',
-            'Windspeed': 'Avg_Windspeed'
-        })
-
-        # Convert dates to string format for JSON serialization
-        daily_data['Date'] = daily_data['Date'].astype(str)
-
-        # Convert DataFrame to JSON format
-        weather_data_json = daily_data.to_dict(orient='records')
+        # Format the data
+        columns = ['Date', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed']
+        weather_data = format_daily_data(result, columns)
 
         return Response(
-            body=json.dumps(weather_data_json),
+            body=json.dumps(weather_data),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
@@ -168,26 +129,6 @@ def fetch_combined_weather_data():
         if not sensor_result:
             raise BadRequestError("No data found for the WeatherSensor table.")
 
-        # Convert WeatherSensor data to a DataFrame
-        sensor_df = pd.DataFrame(sensor_result, columns=['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed'])
-        sensor_df['timestamp'] = pd.to_datetime(sensor_df['timestamp'])  # Ensure timestamp is in datetime format
-        sensor_df['Date'] = sensor_df['timestamp'].dt.date  # Extract the date
-
-        daily_sensor_data = sensor_df.groupby('Date').agg({
-            'temperature': 'mean',
-            'humidity': 'mean',
-            'precipitation': 'sum',  # Total precipitation per day
-            'windspeed': 'mean'
-        }).reset_index()
-
-        # Rename columns to match React's expected format
-        daily_sensor_data = daily_sensor_data.rename(columns={
-            'temperature': 'Avg_Temperature',
-            'humidity': 'Avg_Humidity',
-            'precipitation': 'Avg_Precipitation',
-            'windspeed': 'Avg_Windspeed'
-        })
-
         # Fetch data from WeatherPrediction
         with create_connection().cursor() as cursor:
             cursor.execute(prediction_query)
@@ -196,38 +137,24 @@ def fetch_combined_weather_data():
         if not prediction_result:
             raise BadRequestError("No data found for the WeatherPrediction table.")
 
-        # Convert WeatherPrediction data to a DataFrame
-        prediction_df = pd.DataFrame(prediction_result, columns=['Date', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed'])
-        prediction_df['Date'] = pd.to_datetime(prediction_df['Date']).dt.date  # Convert Date to proper date object
+        # Format the data
+        sensor_columns = ['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed']
+        prediction_columns = ['Date', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed']
 
-        daily_prediction_data = prediction_df.groupby('Date').agg({
-            'Temperature': 'mean',
-            'Humidity': 'mean',
-            'Precipitation': 'sum',
-            'Windspeed': 'mean'
-        }).reset_index()
+        sensor_data = format_daily_data(sensor_result, sensor_columns)
+        prediction_data = format_daily_data(prediction_result, prediction_columns)
 
-        # Rename columns to match React's expected format
-        daily_prediction_data = daily_prediction_data.rename(columns={
-            'Temperature': 'Avg_Temperature',
-            'Humidity': 'Avg_Humidity',
-            'Precipitation': 'Avg_Precipitation',
-            'Windspeed': 'Avg_Windspeed'
-        })
-
-        # Add a column to distinguish between actual and predicted data
-        daily_sensor_data['Type'] = 'Actual'
-        daily_prediction_data['Type'] = 'Predicted'
+        # Add a type field to distinguish between actual and predicted data
+        for data in sensor_data:
+            data['Type'] = 'Actual'
+        for data in prediction_data:
+            data['Type'] = 'Predicted'
 
         # Combine both datasets
-        combined_data = pd.concat([daily_sensor_data, daily_prediction_data], ignore_index=True)
-        combined_data['Date'] = combined_data['Date'].astype(str)  # Serialize dates to string
-
-        # Convert DataFrame to JSON format
-        combined_data_json = combined_data.to_dict(orient='records')
+        combined_data = sensor_data + prediction_data
 
         return Response(
-            body=json.dumps(combined_data_json),
+            body=json.dumps(combined_data),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
@@ -266,24 +193,13 @@ def fetch_closest_weather_data():
         if not sensor_result:
             raise Exception("No recent data found in the WeatherSensor table.")
 
-        # Process the WeatherSensor data into a DataFrame
-        sensor_df = pd.DataFrame([sensor_result])
-        sensor_df['timestamp'] = pd.to_datetime(sensor_df['timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
-
-        # Rename columns to match React's expected format
-        sensor_df = sensor_df.rename(columns={
-            'timestamp': 'Timestamp',
-            'temperature': 'Temperature',
-            'humidity': 'Humidity',
-            'precipitation': 'Precipitation',
-            'windspeed': 'Windspeed'
-        })
-
-        # Convert DataFrame to JSON format
-        sensor_data_json = sensor_df.to_dict(orient='records')
+        # Format the data
+        columns = ['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed']
+        sensor_data = dict(zip(columns, sensor_result))
+        sensor_data['timestamp'] = sensor_data['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
 
         return Response(
-            body=json.dumps(sensor_data_json),
+            body=json.dumps([sensor_data]),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
@@ -343,39 +259,15 @@ def fetch_current_and_next_days_weather():
         if not next_days_result:
             raise Exception("No data found for the next 3 days in the WeatherPrediction table.")
 
-        # Convert current day data to a DataFrame
-        current_day_df = pd.DataFrame(current_day_result)
-        next_days_df = pd.DataFrame(next_days_result)
+        # Format the data
+        current_day_data = format_daily_data(current_day_result, ['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed'])
+        next_days_data = format_daily_data(next_days_result, ['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed'])
 
-        # Format timestamps
-        current_day_df['timestamp'] = pd.to_datetime(current_day_df['timestamp']).dt.strftime('%Y-%m-%d')
-        next_days_df['timestamp'] = pd.to_datetime(next_days_df['timestamp']).dt.strftime('%Y-%m-%d')
-
-        # Rename columns to match React's expected format
-        current_day_df = current_day_df.rename(columns={
-            'timestamp': 'Timestamp',
-            'temperature': 'Temperature',
-            'humidity': 'Humidity',
-            'precipitation': 'Precipitation',
-            'windspeed': 'Windspeed'
-        })
-
-        next_days_df = next_days_df.rename(columns={
-            'timestamp': 'Timestamp',
-            'temperature': 'Temperature',
-            'humidity': 'Humidity',
-            'precipitation': 'Precipitation',
-            'windspeed': 'Windspeed'
-        })
-
-        # Combine both dataframes
-        combined_df = pd.concat([current_day_df, next_days_df], ignore_index=True)
-
-        # Convert DataFrame to JSON format
-        combined_data_json = combined_df.to_dict(orient='records')
+        # Combine both datasets
+        combined_data = current_day_data + next_days_data
 
         return Response(
-            body=json.dumps(combined_data_json),
+            body=json.dumps(combined_data),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
@@ -437,28 +329,15 @@ def fetch_current_and_next_hours_weather():
         if not next_hours_result:
             raise Exception("No data found for the next 2 hours in the WeatherPrediction24 table.")
 
-        # Convert current hours' data to a DataFrame
-        current_hours_df = pd.DataFrame(current_hours_result, columns=[
-            'Timestamp', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed'
-        ])
+        # Format the data
+        current_hours_data = format_daily_data(current_hours_result, ['Timestamp', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed'])
+        next_hours_data = format_daily_data(next_hours_result, ['Timestamp', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed'])
 
-        # Convert next hours' data to a DataFrame
-        next_hours_df = pd.DataFrame(next_hours_result, columns=[
-            'Timestamp', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed'
-        ])
-
-        # Format timestamps
-        current_hours_df['Timestamp'] = pd.to_datetime(current_hours_df['Timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
-        next_hours_df['Timestamp'] = pd.to_datetime(next_hours_df['Timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
-
-        # Combine both DataFrames
-        combined_df = pd.concat([current_hours_df, next_hours_df], ignore_index=True)
-
-        # Convert DataFrame to JSON format
-        combined_data_json = combined_df.to_dict(orient='records')
+        # Combine both datasets
+        combined_data = current_hours_data + next_hours_data
 
         return Response(
-            body=json.dumps(combined_data_json),
+            body=json.dumps(combined_data),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
@@ -469,5 +348,3 @@ def fetch_current_and_next_hours_weather():
             status_code=500,
             headers={'Content-Type': 'application/json'}
         )
-
-

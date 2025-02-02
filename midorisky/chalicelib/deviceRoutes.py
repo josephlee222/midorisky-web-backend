@@ -1,7 +1,6 @@
 from chalice import Blueprint, Response, BadRequestError
 from chalice import Chalice
 import boto3
-import pandas as pd
 import json
 from .connectHelper import create_connection
 
