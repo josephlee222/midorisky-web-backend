@@ -1,23 +1,27 @@
 from chalice import Blueprint, Response, BadRequestError
 import boto3
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from .connectHelper import create_connection
+import traceback
+from .helpers import json_serial
 
 weather_routes = Blueprint(__name__)
 
 s3 = boto3.client('s3')
 
-def format_daily_data(result, columns):
-    """
-    Format daily data from the database result.
-    """
-    data = []
-    for row in result:
-        row_dict = dict(zip(columns, row))
-        row_dict['timestamp'] = row_dict['timestamp'].strftime('%Y-%m-%d') if 'timestamp' in row_dict else row_dict['Date'].strftime('%Y-%m-%d')
-        data.append(row_dict)
-    return data
+# def format_daily_data(result, columns):
+#     """
+#     Format daily data from the database result.
+#     """
+#     data = []
+#     for row in result:
+#         row_dict = dict(zip(columns, row))
+#         # convert string to datetime object (2019-01-01 00:00:00.000000)
+#         #print(row['timestamp'])
+#         row_dict['timestamp'] = row['timestamp']
+#         data.append(row_dict)
+#     return data
 
 @weather_routes.route('/staff/weather/fetch-weather-data', methods=['GET'], cors=True)
 def fetch_weather_data():
@@ -41,10 +45,10 @@ def fetch_weather_data():
 
         # Format the data
         columns = ['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed']
-        weather_data = format_daily_data(result, columns)
+        weather_data = result
 
         return Response(
-            body=json.dumps(weather_data),
+            body=json.dumps(weather_data, default=json_serial),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
@@ -84,10 +88,10 @@ def fetch_predicted_weather_data():
 
         # Format the data
         columns = ['Date', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed']
-        weather_data = format_daily_data(result, columns)
+        weather_data = result
 
         return Response(
-            body=json.dumps(weather_data),
+            body=json.dumps(weather_data, default=json_serial),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
@@ -141,8 +145,8 @@ def fetch_combined_weather_data():
         sensor_columns = ['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed']
         prediction_columns = ['Date', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed']
 
-        sensor_data = format_daily_data(sensor_result, sensor_columns)
-        prediction_data = format_daily_data(prediction_result, prediction_columns)
+        sensor_data = sensor_result
+        prediction_data = prediction_result
 
         # Add a type field to distinguish between actual and predicted data
         for data in sensor_data:
@@ -154,7 +158,7 @@ def fetch_combined_weather_data():
         combined_data = sensor_data + prediction_data
 
         return Response(
-            body=json.dumps(combined_data),
+            body=json.dumps(combined_data, default=json_serial),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
@@ -166,6 +170,8 @@ def fetch_combined_weather_data():
             headers={'Content-Type': 'application/json'}
         )
     except Exception as e:
+        # Print error stack trace
+        print(traceback.format_exc())
         return Response(
             body=json.dumps({"error": str(e)}),
             status_code=500,
@@ -199,7 +205,7 @@ def fetch_closest_weather_data():
         sensor_data['timestamp'] = sensor_data['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
 
         return Response(
-            body=json.dumps([sensor_data]),
+            body=json.dumps([sensor_data], default=json_serial),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
@@ -260,14 +266,14 @@ def fetch_current_and_next_days_weather():
             raise Exception("No data found for the next 3 days in the WeatherPrediction table.")
 
         # Format the data
-        current_day_data = format_daily_data(current_day_result, ['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed'])
-        next_days_data = format_daily_data(next_days_result, ['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed'])
+        current_day_data = current_day_result
+        next_days_data = next_days_result
 
         # Combine both datasets
         combined_data = current_day_data + next_days_data
 
         return Response(
-            body=json.dumps(combined_data),
+            body=json.dumps(combined_data, default=json_serial),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
@@ -330,14 +336,14 @@ def fetch_current_and_next_hours_weather():
             raise Exception("No data found for the next 2 hours in the WeatherPrediction24 table.")
 
         # Format the data
-        current_hours_data = format_daily_data(current_hours_result, ['Timestamp', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed'])
-        next_hours_data = format_daily_data(next_hours_result, ['Timestamp', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed'])
+        current_hours_data = current_hours_result
+        next_hours_data = next_hours_result
 
         # Combine both datasets
         combined_data = current_hours_data + next_hours_data
 
         return Response(
-            body=json.dumps(combined_data),
+            body=json.dumps(combined_data, default=json_serial),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
