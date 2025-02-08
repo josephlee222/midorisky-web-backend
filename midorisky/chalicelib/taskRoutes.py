@@ -4,9 +4,30 @@ from .authorizers import farmer_authorizer, farm_manager_authorizer
 from .connectHelper import create_connection
 from .notificationService import create_notification
 import json
+import os
+import traceback
+import urllib.parse as urllib
+from requests_toolbelt.multipart import decoder
 
 task_routes = Blueprint(__name__)
 s3 = boto3.client('s3')
+
+
+@task_routes.route('/tasks', authorizer=farm_manager_authorizer, cors=True, methods=['POST'])
+def create_task():
+    request = task_routes.current_request
+    body = request.json_body
+
+    title = body["title"]
+    description = body["description"]
+    priority = body["priority"]
+
+    sql = "INSERT INTO Tasks (title, description, priority, created_by) VALUES (%s, %s, %s, %s)"
+
+    with create_connection().cursor() as cursor:
+        cursor.execute(sql, (title, description, priority, task_routes.current_request.context['authorizer']['principalId']))
+        return {"message": "Task created successfully!"}
+
 
 # Get all tasks from the database
 @task_routes.route('/tasks/list/{display}', authorizer=farm_manager_authorizer, cors=True)
@@ -140,33 +161,74 @@ def get_task_attachments(id):
     return attachments
 
 
-@task_routes.route('/tasks/{id}/attachments/{filename}', authorizer=farmer_authorizer, cors=True)
+@task_routes.route('/tasks/{id}/attachments/{filename}', cors=True, methods=['GET'], authorizer=farmer_authorizer)
 def get_task_attachment(id, filename):
+    filename = urllib.unquote(filename)
     try:
         response = s3.get_object(
-            Bucket='midori-bucket',
-            Key=f'tasks/{id}/{filename}'
+            Bucket=os.environ.get('S3_BUCKET'),
+            Key="tasks/" + id + "/" + filename
         )
     except Exception as e:
+        traceback.print_exc()
         raise BadRequestError("Error fetching attachment")
 
     return Response(body=response['Body'].read(), headers={'Content-Type': response['ContentType']})
 
 
-@task_routes.route('/tasks', authorizer=farm_manager_authorizer, cors=True, methods=['POST'])
-def create_task():
-    request = task_routes.current_request
-    body = request.json_body
+@task_routes.route('/tasks/{id}/attachments/{filename}', cors=True, methods=['DELETE'], authorizer=farm_manager_authorizer)
+def delete_task_attachment(id, filename):
+    try:
+        filename = urllib.unquote(filename)
+        s3.delete_object(
+            Bucket=os.environ.get('S3_BUCKET'),
+            Key=f'items/{id}/{filename}'
+        )
+    except Exception as e:
+        traceback.print_exc()
+        raise BadRequestError("Error deleting attachment")
 
-    title = body["title"]
-    description = body["description"]
-    priority = body["priority"]
-
-    sql = "INSERT INTO Tasks (title, description, priority, created_by) VALUES (%s, %s, %s, %s)"
+    sql = "DELETE FROM taskAttachments WHERE itemId = %s AND filename = %s"
 
     with create_connection().cursor() as cursor:
-        cursor.execute(sql, (title, description, priority, task_routes.current_request.context['authorizer']['principalId']))
-        return {"message": "Task created successfully!"}
+        cursor.execute(sql, (id, filename))
+
+    return {'message': 'File deleted successfully'}
+
+
+@task_routes.route('/tasks/{id}/attachments', cors=True, methods=['POST'], content_types=['multipart/form-data'], authorizer=farm_manager_authorizer)
+def upload_task_attachment(id):
+    request = task_routes.current_request
+    body = request.raw_body
+
+    # decode the multipart form data
+    d = decoder.MultipartDecoder(body, request.headers['content-type'])
+    file = None
+    filename = None
+
+    part = d.parts[1]
+    if part.headers[b'Content-Disposition']:
+        filename = part.headers[b'Content-Disposition'].decode('utf-8').split('filename=')[1].strip('"')
+
+        file = part.content
+
+    if not file or not filename:
+        raise BadRequestError('File not found in request')
+
+    # upload the file to S3
+    s3.put_object(
+        Bucket=os.environ.get('S3_BUCKET'),
+        Key=f'tasks/{id}/{filename}',
+        Body=file,
+        ContentType=part.headers[b'Content-Type'].decode('utf-8')
+    )
+
+    sql = "INSERT INTO taskAttachments (itemId, filename) VALUES (%s, %s)"
+
+    with create_connection().cursor() as cursor:
+        cursor.execute(sql, (id, filename))
+
+    return {'message': 'File uploaded successfully'}
 
 
 def get_attachments(task_id):

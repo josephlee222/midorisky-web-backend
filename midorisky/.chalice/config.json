@@ -6,7 +6,9 @@
     "USER_POOL_ID": "us-east-1_cgJgNBs7M",
     "REGION": "us-east-1",
     "SES_EMAIL": "midorisky@cat2.link",
-    "SQS_URL": "https://sqs.us-east-1.amazonaws.com/710271913812/midori-queue"
+    "SQS_URL": "https://sqs.us-east-1.amazonaws.com/710271913812/midori-queue",
+    "S3_BUCKET": "midori-bucket",
+    "SSM_PREFIX": "/midori/"
   },
   "automatic_layer": true,
   "lambda_memory_size": 512,

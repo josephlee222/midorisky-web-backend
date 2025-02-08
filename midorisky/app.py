@@ -17,6 +17,8 @@ app.register_blueprint(auth_functions)
 app.register_blueprint(weather_routes)
 app.register_blueprint(device_routes)
 
+app.api.binary_types.append('multipart/form-data')
+
 @app.route('/', cors=True)
 def index():
     return {'message': 'Hello world, from MidoriSKY!'}
