@@ -182,13 +182,13 @@ def delete_task_attachment(id, filename):
         filename = urllib.unquote(filename)
         s3.delete_object(
             Bucket=os.environ.get('S3_BUCKET'),
-            Key=f'items/{id}/{filename}'
+            Key=f'tasks/{id}/{filename}'
         )
     except Exception as e:
         traceback.print_exc()
         raise BadRequestError("Error deleting attachment")
 
-    sql = "DELETE FROM taskAttachments WHERE itemId = %s AND filename = %s"
+    sql = "DELETE FROM taskAttachments WHERE taskId = %s AND filename = %s"
 
     with create_connection().cursor() as cursor:
         cursor.execute(sql, (id, filename))
@@ -223,7 +223,7 @@ def upload_task_attachment(id):
         ContentType=part.headers[b'Content-Type'].decode('utf-8')
     )
 
-    sql = "INSERT INTO taskAttachments (itemId, filename) VALUES (%s, %s)"
+    sql = "INSERT INTO taskAttachments (taskId, filename) VALUES (%s, %s)"
 
     with create_connection().cursor() as cursor:
         cursor.execute(sql, (id, filename))
@@ -243,9 +243,5 @@ def get_attachments(task_id):
             # remove the folder name from the list of attachments
             obj['Key'] = obj['Key'].replace(f'tasks/{task_id}/', '')
             attachments.append(obj['Key'])
-
-    # remove the first element which is the folder itself
-    if len(attachments) > 0:
-        attachments.pop(0)
 
     return attachments
