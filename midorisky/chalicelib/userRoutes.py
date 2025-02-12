@@ -36,6 +36,20 @@ def get_users():
     return json.loads(json.dumps(output_users, default=str))
 
 
+@user_routes.route('/predict/users/{username}', authorizer=farmer_authorizer, cors=True, methods=['GET'])
+def predict_username(username):
+    users = idp_client.list_users(
+        UserPoolId=pool_id,
+        Filter=f"username ^= \"{username}\"",
+    )
+
+    if users:
+        # Make array of usernames
+        usernames = [user["Username"] for user in users["Users"]]
+        return usernames
+
+    return []
+
 @user_routes.route('/admin/users/{username}', authorizer=admin_authorizer, cors=True, methods=['GET'])
 def get_user(username):
     user = idp_client.admin_get_user(

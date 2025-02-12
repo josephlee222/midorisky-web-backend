@@ -8,6 +8,7 @@ import os
 import traceback
 import urllib.parse as urllib
 from requests_toolbelt.multipart import decoder
+from .helpers import json_serial
 
 task_routes = Blueprint(__name__)
 s3 = boto3.client('s3')
@@ -26,7 +27,14 @@ def create_task():
 
     with create_connection().cursor() as cursor:
         cursor.execute(sql, (title, description, priority, task_routes.current_request.context['authorizer']['principalId']))
-        return {"message": "Task created successfully!"}
+
+        # get the last inserted item
+        cursor.execute("SELECT * FROM Tasks WHERE id = %s", (cursor.lastrowid))
+
+        result = cursor.fetchone()
+
+        create_notification("task", result["id"], "Task Updated", "A task has been created. Please check the task for more details.\n\nTask Details:\nTitle: " + result['title'] + "\nDescription: " + result['description'])
+        return json.loads(json.dumps(result, default=json_serial))
 
 
 # Get all tasks from the database
@@ -100,6 +108,20 @@ def delete_task(id):
 
     with create_connection().cursor() as cursor:
         cursor.execute(sql, id)
+
+        # delete the attachments
+        response = s3.list_objects_v2(
+            Bucket=os.environ.get('S3_BUCKET'),
+            Prefix=f'tasks/{id}/'
+        )
+
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                s3.delete_object(
+                    Bucket=os.environ.get('S3_BUCKET'),
+                    Key=obj['Key']
+                )
+
         return {"message": "Task deleted successfully!"}
 
 @task_routes.route('/tasks/{id}', authorizer=farm_manager_authorizer, cors=True, methods=['PUT'])
@@ -154,6 +176,38 @@ def update_task_status(id):
             return ForbiddenError("You are not authorized to update the status of this task")
         cursor.execute(sql, (status, id))
         return {"message": "Task status updated successfully!"}
+
+
+@task_routes.route('/tasks/{id}/assignees', cors=True, methods=['GET'], authorizer=farmer_authorizer)
+def get_task_assignees(id):
+    sql = "SELECT username FROM TasksAssignees WHERE taskId = %s"
+
+    with create_connection().cursor() as cursor:
+        cursor.execute(sql, id)
+        result = cursor.fetchall()
+
+        # put usernames in a list
+        result = [x['username'] for x in result]
+        return result
+
+
+@task_routes.route('/tasks/{id}/assignees', cors=True, methods=['POST'], authorizer=farm_manager_authorizer)
+def set_task_assignees(id):
+    request = task_routes.current_request
+    body = request.json_body
+
+    assignees = body["assignees"]
+
+    delete_sql = "DELETE FROM TasksAssignees WHERE taskId = %s"
+    sql = "INSERT INTO TasksAssignees (taskId, username) VALUES (%s, %s)"
+
+    with create_connection().cursor() as cursor:
+        cursor.execute(delete_sql, id)
+        for assignee in assignees:
+            cursor.execute(sql, (id, assignee))
+
+    return {"message": "Assignees added successfully!"}
+
 
 @task_routes.route('/tasks/{id}/attachments', authorizer=farmer_authorizer, cors=True)
 def get_task_attachments(id):
