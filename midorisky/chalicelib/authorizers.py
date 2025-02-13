@@ -113,3 +113,22 @@ def farmer_authorizer(auth_request):
 
     # Return the AuthResponse with user context
     return AuthResponse(routes=['*'], principal_id=decoded_token['username'])
+
+@auth_functions.authorizer()
+def login_authorizer(auth_request):
+    """Authorizer to validate JWT tokens and check user group membership."""
+    token = auth_request.token
+    if not token:
+        raise UnauthorizedError("Missing authorization token")
+
+    try:
+        # Decode and validate the JWT
+        decoded_token = decode_jwt(token)
+    except UnauthorizedError as e:
+        return AuthResponse(routes=[], principal_id='user')
+
+    # Check if the user belongs to the required group
+    user_groups = decoded_token.get('cognito:groups', [])  # Ensure 'groups' is part of your token payload
+
+    # Return the AuthResponse with user context
+    return AuthResponse(routes=['*'], principal_id=decoded_token['username'])

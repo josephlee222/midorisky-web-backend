@@ -3,7 +3,7 @@
     {
       "name": "managed-layer",
       "resource_type": "lambda_layer",
-      "layer_version_arn": "arn:aws:lambda:us-east-1:710271913812:layer:midorisky-dev-managed-layer:17"
+      "layer_version_arn": "arn:aws:lambda:us-east-1:710271913812:layer:midorisky-dev-managed-layer:35"
     },
     {
       "name": "handle_sqs_message_role",
@@ -20,7 +20,7 @@
       "name": "handle_sqs_message-sqs-event-source",
       "resource_type": "sqs_event",
       "queue_arn": "arn:aws:sqs:us-east-1:710271913812:midori-queue",
-      "event_uuid": "62a4167c-8ccf-4452-b41e-f9c145aa21bc",
+      "event_uuid": "e4721c08-0025-44b6-90b8-51a66a82e3ea",
       "queue": "midori-queue",
       "lambda_arn": "arn:aws:lambda:us-east-1:710271913812:function:midorisky-dev-handle_sqs_message"
     },
@@ -69,10 +69,60 @@
       "lambda_arn": "arn:aws:lambda:us-east-1:710271913812:function:midorisky-dev-farmer_authorizer"
     },
     {
+      "name": "login_authorizer_role",
+      "resource_type": "iam_role",
+      "role_arn": "arn:aws:iam::710271913812:role/midorisky-dev-login_authorizer",
+      "role_name": "midorisky-dev-login_authorizer"
+    },
+    {
+      "name": "login_authorizer",
+      "resource_type": "lambda_function",
+      "lambda_arn": "arn:aws:lambda:us-east-1:710271913812:function:midorisky-dev-login_authorizer"
+    },
+    {
       "name": "rest_api",
       "resource_type": "rest_api",
       "rest_api_id": "oylgm1p6a1",
       "rest_api_url": "https://oylgm1p6a1.execute-api.us-east-1.amazonaws.com/api/"
+    },
+    {
+      "name": "websocket_connect_role",
+      "resource_type": "iam_role",
+      "role_arn": "arn:aws:iam::710271913812:role/midorisky-dev-websocket_connect",
+      "role_name": "midorisky-dev-websocket_connect"
+    },
+    {
+      "name": "websocket_connect",
+      "resource_type": "lambda_function",
+      "lambda_arn": "arn:aws:lambda:us-east-1:710271913812:function:midorisky-dev-websocket_connect"
+    },
+    {
+      "name": "websocket_message_role",
+      "resource_type": "iam_role",
+      "role_arn": "arn:aws:iam::710271913812:role/midorisky-dev-websocket_message",
+      "role_name": "midorisky-dev-websocket_message"
+    },
+    {
+      "name": "websocket_message",
+      "resource_type": "lambda_function",
+      "lambda_arn": "arn:aws:lambda:us-east-1:710271913812:function:midorisky-dev-websocket_message"
+    },
+    {
+      "name": "websocket_disconnect_role",
+      "resource_type": "iam_role",
+      "role_arn": "arn:aws:iam::710271913812:role/midorisky-dev-websocket_disconnect",
+      "role_name": "midorisky-dev-websocket_disconnect"
+    },
+    {
+      "name": "websocket_disconnect",
+      "resource_type": "lambda_function",
+      "lambda_arn": "arn:aws:lambda:us-east-1:710271913812:function:midorisky-dev-websocket_disconnect"
+    },
+    {
+      "name": "websocket_api",
+      "resource_type": "websocket_api",
+      "websocket_api_url": "wss://oetxtdnir0.execute-api.us-east-1.amazonaws.com/api/",
+      "websocket_api_id": "oetxtdnir0"
     }
   ],
   "schema_version": "2.0",

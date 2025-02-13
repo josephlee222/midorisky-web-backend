@@ -1,8 +1,10 @@
-from chalice import Blueprint, BadRequestError
+from chalice import Blueprint, BadRequestError, WebsocketDisconnectedError
 import json
 import os
 from .connectHelper import create_connection
+from .authorizers import login_authorizer
 from .helpers import json_serial
+from .wsService import Sender
 import boto3
 
 notification_service = Blueprint(__name__)
@@ -27,75 +29,30 @@ def create_notification(itemType, id, title, message, action=None):
         MessageBody=json.dumps(message)
     )
 
+@notification_service.route('/notifications', methods=['GET'], cors=True, authorizer=login_authorizer)
+def get_notifications():
+    username  = notification_service.current_request.context['authorizer']['principalId']
+    sql = "SELECT username, title, subtitle, action_url, action FROM Notifications WHERE username = %s AND is_read = false ORDER BY created_at DESC LIMIT 5"
 
-@notification_service.on_sqs_message(queue='midori-queue', batch_size=5)
-def handle_sqs_message(event):
-    print("Hello world")
-    for record in event:
-        # Parse the record
-        data = json.loads(record.body)
-        print(data)
+    with create_connection().cursor() as cursor:
+        cursor.execute(sql, (username))
+        result = cursor.fetchall()
+        return result
 
-        type = data['type']
-        id = data['id']
-        title = data['title']
-        message = data['message']
+@notification_service.route('/notifications/read', methods=['GET'], cors=True, authorizer=login_authorizer)
+def read_all_notifications():
+    username  = notification_service.current_request.context['authorizer']['principalId']
+    sql = "UPDATE Notifications SET is_read = 1 WHERE username = %s"
 
-        if type == 'task':
-            # query item by id
-            sql = "SELECT * FROM midori.Tasks WHERE id = %s"
+    with create_connection().cursor() as cursor:
+        cursor.execute(sql, (username))
+        return
 
-            with create_connection().cursor() as cursor:
-                cursor.execute(sql, (id))
-                item = cursor.fetchone()
+@notification_service.route('/notifications/read/{id}', methods=['GET'], cors=True, authorizer=login_authorizer)
+def read_notification(id):
+    username  = notification_service.current_request.context['authorizer']['principalId']
+    sql = "UPDATE Notifications SET is_read = 1 WHERE id = %s AND username = %s"
 
-                #print(json.dumps(item, default=json_serial))
-
-                if item:
-                    taskId = item['id']
-                    # query notification subscribers based on categoryId
-                    sql = "SELECT * FROM midori.TasksAssignees WHERE taskId = %s"
-
-                    with create_connection().cursor() as cursor:
-                        cursor.execute(sql, (taskId))
-                        assignees = cursor.fetchall()
-
-                        #print(json.dumps(assignees, default=json_serial))
-
-                        emails = []
-                        if assignees:
-                            for assignee in assignees:
-                                # query user by username
-                                user = cognito_idp.admin_get_user(
-                                    UserPoolId=os.environ.get('USER_POOL_ID'),
-                                    Username=assignee['username']
-                                )
-
-                                for attribute in user['UserAttributes']:
-                                    if attribute['Name'] == 'email':
-                                        emails.append(attribute['Value'])
-                                        break
-
-                            print(emails)
-                            # send email to users
-                            response = ses.send_email(
-                                Source=os.environ.get('SES_EMAIL'),
-                                Destination={
-                                    'ToAddresses': emails
-                                },
-                                Message={
-                                    'Subject': {
-                                        'Data': title
-                                    },
-                                    'Body': {
-                                        'Text': {
-                                            'Data': message
-                                        }
-                                    }
-                                }
-                            )
-
-                            for email in emails:
-                                print('Email sent to: ' + email)
-                else:
-                    return
+    with create_connection().cursor() as cursor:
+        cursor.execute(sql, (id, username))
+        return
