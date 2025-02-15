@@ -40,6 +40,22 @@ create table IoTDevices
     PlotID          varchar(10) null
 );
 
+create table Notifications
+(
+    id         int auto_increment
+        primary key,
+    username   varchar(128)  default 'admin'                         not null,
+    title      varchar(512)  default 'Sample Notification'           not null,
+    subtitle   varchar(1024) default 'This is a sample notification' not null,
+    action_url varchar(2048) default '/'                             not null,
+    created_at datetime      default CURRENT_TIMESTAMP               not null,
+    is_read    bit           default b'0'                            null,
+    action     varchar(128)  default 'View'                          not null
+);
+
+create index Notifications_username_created_at_index
+    on Notifications (username asc, created_at desc);
+
 create table SoilMoistureIoT
 (
     id              int auto_increment
@@ -147,5 +163,13 @@ create table taskAttachments
     constraint taskAttachments_tasks_id_fk
         foreign key (taskId) references Tasks (id)
             on delete cascade
+);
+
+create table wsConnections
+(
+    id            int auto_increment
+        primary key,
+    connection_id text not null,
+    username      text not null
 );
 
