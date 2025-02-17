@@ -51,6 +51,12 @@
       "Action": "ses:*",
       "Effect": "Allow",
       "Resource": "*"
+    },
+    {
+        "Sid": "Stmt1736093014299",
+        "Action": "execute-api:*",
+        "Effect": "Allow",
+        "Resource": "*"
     }
   ]
 }

@@ -53,8 +53,6 @@ def connect(event):
     return json.dumps({'message': 'Connected'})
 
 
-
-
 @app.on_ws_disconnect()
 def disconnect(event):
     with create_connection().cursor() as cursor:
@@ -87,9 +85,14 @@ def insert_notification(username, title, subtitle, url, action="View"):
         cursor.execute(sql, (username, title, subtitle, url, action))
         cursor.execute(connections_sql, (username))
 
+        # Get notification just created
+        cursor.execute("SELECT  FROM Notifications WHERE username = %s ORDER BY created_at DESC LIMIT 1", (username))
+        notification = cursor.fetchone()
         connections = cursor.fetchall()
 
-    #sender.broadcast(connections, json.dumps({'type': 'notification', 'title': title, 'subtitle': subtitle, 'action_url': url, 'action': action}))
+    # put connections in a list
+    connections_list = [connection['connection_id'] for connection in connections]
+    sender.broadcast(connections_list, json.dumps({'id': notification['id'], 'type': 'notification', 'title': title, 'subtitle': subtitle, 'action_url': url, 'action': action}))
     return
 
 
