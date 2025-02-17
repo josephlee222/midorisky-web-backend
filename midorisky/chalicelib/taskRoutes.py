@@ -24,6 +24,7 @@ def create_task():
     priority = body["priority"]
 
     sql = "INSERT INTO Tasks (title, description, priority, created_by) VALUES (%s, %s, %s, %s)"
+    assigneeSql = "INSERT INTO TasksAssignees (taskId, username) VALUES (%s, %s)"
 
     with create_connection().cursor() as cursor:
         cursor.execute(sql, (title, description, priority, task_routes.current_request.context['authorizer']['principalId']))
@@ -32,6 +33,9 @@ def create_task():
         cursor.execute("SELECT * FROM Tasks WHERE id = %s", (cursor.lastrowid))
 
         result = cursor.fetchone()
+
+        # assign the creator to the task
+        cursor.execute(assigneeSql, (cursor.lastrowid, task_routes.current_request.context['authorizer']['principalId']))
 
         create_notification("task", id, "create")
         return json.loads(json.dumps(result, default=json_serial))
@@ -85,6 +89,73 @@ def get_all_tasks(display):
 
         result = cursor.fetchall()
         return json.loads(json.dumps(result, default=str))
+
+
+@task_routes.route('/tasks/{id}/comments', authorizer=farmer_authorizer, cors=True)
+def get_task_comments(id):
+    sql = "SELECT * FROM TaskComments WHERE taskId = %s"
+
+    with create_connection().cursor() as cursor:
+        cursor.execute(sql, id)
+        result = cursor.fetchall()
+        return json.loads(json.dumps(result, default=str))
+
+
+@task_routes.route('/tasks/{id}/comments', authorizer=farmer_authorizer, cors=True, methods=['POST'])
+def create_task_comment(id):
+    request = task_routes.current_request
+    body = request.json_body
+
+    comment = body["comment"]
+    sql = "INSERT INTO TaskComments (taskId, comment, username) VALUES (%s, %s, %s)"
+
+    with create_connection().cursor() as cursor:
+        cursor.execute(sql, (id, comment, task_routes.current_request.context['authorizer']['principalId']))
+
+        # get the last inserted item
+        cursor.execute("SELECT * FROM TaskComments WHERE id = %s", (cursor.lastrowid))
+
+        result = cursor.fetchone()
+        create_notification("comment", id, "comment")
+        return json.loads(json.dumps(result, default=json_serial))
+
+
+@task_routes.route('/tasks/{id}/comments/{commentId}', authorizer=farmer_authorizer, cors=True, methods=['DELETE'])
+def delete_task_comment(id, commentId):
+    sql = "DELETE FROM TaskComments WHERE id = %s AND taskId = %s"
+
+    try:
+        with create_connection().cursor() as cursor:
+            cursor.execute(sql, commentId)
+            return {"message": "Comment deleted successfully!"}
+    except Exception as e:
+        raise BadRequestError(str(e))
+
+
+@task_routes.route('/tasks/{id}/comments/{commentId}', authorizer=farmer_authorizer, cors=True, methods=['PUT'])
+def edit_task_comment(id, commentId):
+    request = task_routes.current_request
+    body = request.json_body
+
+    comment = body["comment"]
+
+    getSql = "SELECT * FROM TaskComments WHERE id = %s"
+    sql = "UPDATE TaskComments SET comment = %s WHERE id = %s"
+
+
+    with create_connection().cursor() as cursor:
+        cursor.execute(getSql, commentId)
+
+        # check if the comment author is the same as the current user
+        comment = cursor.fetchone()
+        if comment['createdBy'] != task_routes.current_request.context['authorizer']['principalId']:
+            raise ForbiddenError("You are not authorized to update this comment")
+
+        try:
+            cursor.execute(sql, (comment, commentId))
+            return {"message": "Comment updated successfully!"}
+        except Exception as e:
+            raise BadRequestError(str(e))
 
 
 @task_routes.route('/tasks/{id}', authorizer=farmer_authorizer, cors=True)

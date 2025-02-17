@@ -107,10 +107,42 @@ def handle_sqs_message(event):
 
         type = data['type']
 
-        if type == 'task':
+        if type == 'task' or type == 'assignee':
             handleTaskType(data)
-        elif type == 'assignee':
-            handleTaskType(data)
+        elif type == 'comment':
+            handleCommentType(data)
+
+
+def handleCommentType(data):
+    ses = boto3.client('ses')
+    sqs = boto3.client('sqs')
+    cognito_idp = boto3.client('cognito-idp')
+
+    id = data['id']
+    action = data['action']
+
+    # query item by id
+    sql = "SELECT * FROM TaskComments WHERE id = %s"
+
+    with create_connection().cursor() as cursor:
+        cursor.execute(sql, (id))
+        item = cursor.fetchone()
+
+        if item:
+            taskId = item['taskId']
+
+            # query task by taskId
+            sql = "SELECT * FROM Tasks WHERE id = %s"
+            cursor.execute(sql, (taskId))
+            task = cursor.fetchone()
+
+            # query task assignees
+            sql = "SELECT * FROM TasksAssignees WHERE taskId = %s"
+            cursor.execute(sql, (taskId))
+            assignees = cursor.fetchall()
+            for assignee in assignees:
+                username = assignee['username']
+                insert_notification(username, task["title"] + " - New Task Comment", "A new comment has been added to a task you are assigned to:\n\n" + item['comment'], '/staff/tasks?task=' + str(taskId), "View Task")
 
 
 
