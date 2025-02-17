@@ -116,7 +116,7 @@ def create_task_comment(id):
         cursor.execute("SELECT * FROM TaskComments WHERE id = %s", (cursor.lastrowid))
 
         result = cursor.fetchone()
-        create_notification("comment", id, "comment")
+        create_notification("comment", result['id'], "comment")
         return json.loads(json.dumps(result, default=json_serial))
 
 
