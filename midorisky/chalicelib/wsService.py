@@ -6,6 +6,7 @@ wsSession = session.Session()
 
 # Get from environment variables
 wsClient = wsSession.client('apigatewaymanagementapi', endpoint_url="https://" + os.environ.get('WS_API_ID') + ".execute-api." + os.environ.get('REGION') + ".amazonaws.com/api")
+print("https://" + os.environ.get('WS_API_ID') + ".execute-api." + os.environ.get('REGION') + ".amazonaws.com/api")
 
 class Sender(object):
     """Class to send messages over websockets."""
@@ -23,12 +24,8 @@ class Sender(object):
 
         :param message: The message to send to the connection.
         """
-        try:
-            wsClient.post_to_connection(ConnectionId=connection_id, Data=message)
-        except wsClient.exceptions.GoneException:
-            # If the connection is gone, delete it from the database
-            with create_connection().cursor() as cursor:
-                cursor.execute("DELETE FROM wsConnections WHERE connection_id = %s", (connection_id))
+
+        wsClient.post_to_connection(ConnectionId=connection_id, Data=message)
 
 
     def broadcast(self, connection_ids, message):
