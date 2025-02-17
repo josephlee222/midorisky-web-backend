@@ -84,11 +84,12 @@ def insert_notification(username, title, subtitle, url, action="View"):
     with create_connection().cursor() as cursor:
         cursor.execute(sql, (username, title, subtitle, url, action))
         cursor.execute(connections_sql, (username))
+        connections = cursor.fetchall()
 
         # Get notification just created
         cursor.execute("SELECT id, username, title, subtitle, action_url, action FROM Notifications WHERE username = %s ORDER BY created_at DESC LIMIT 1", (username))
         notification = cursor.fetchone()
-        connections = cursor.fetchall()
+
 
     # put connections in a list
     connections_list = [connection['connection_id'] for connection in connections]
