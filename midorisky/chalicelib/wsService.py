@@ -1,4 +1,5 @@
 from boto3 import session
+from .connectHelper import create_connection
 import os
 
 wsSession = session.Session()
@@ -22,8 +23,12 @@ class Sender(object):
 
         :param message: The message to send to the connection.
         """
-
-        wsClient.post_to_connection(ConnectionId=connection_id, Data=message)
+        try:
+            wsClient.post_to_connection(ConnectionId=connection_id, Data=message)
+        except wsClient.exceptions.GoneException:
+            # If the connection is gone, delete it from the database
+            with create_connection().cursor() as cursor:
+                cursor.execute("DELETE FROM wsConnections WHERE connection_id = %s", (connection_id))
 
 
     def broadcast(self, connection_ids, message):

@@ -86,7 +86,7 @@ def insert_notification(username, title, subtitle, url, action="View"):
         cursor.execute(connections_sql, (username))
 
         # Get notification just created
-        cursor.execute("SELECT  FROM Notifications WHERE username = %s ORDER BY created_at DESC LIMIT 1", (username))
+        cursor.execute("SELECT id, username, title, subtitle, action_url, action FROM Notifications WHERE username = %s ORDER BY created_at DESC LIMIT 1", (username))
         notification = cursor.fetchone()
         connections = cursor.fetchall()
 
