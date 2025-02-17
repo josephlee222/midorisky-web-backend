@@ -13,20 +13,18 @@ sqs = boto3.client('sqs')
 cognito_idp = boto3.client('cognito-idp')
 
 
-def create_notification(itemType, id, title, message, action=None):
+def create_notification(itemType, id, actionType):
     # Create SQS message
-    message = {
+    qMessage = {
         'type': itemType,
         'id': id,
-        'title': title,
-        'message': message,
-        'action': action
+        'action': actionType
     }
 
     # Send SQS message
     response = sqs.send_message(
         QueueUrl=os.environ.get('SQS_URL'),
-        MessageBody=json.dumps(message)
+        MessageBody=json.dumps(qMessage)
     )
 
 @notification_service.route('/notifications', methods=['GET'], cors=True, authorizer=login_authorizer)

@@ -33,7 +33,7 @@ def create_task():
 
         result = cursor.fetchone()
 
-        create_notification("task", result["id"], "Task Updated", "A task has been created. Please check the task for more details.\n\nTask Details:\nTitle: " + result['title'] + "\nDescription: " + result['description'])
+        create_notification("task", id, "create")
         return json.loads(json.dumps(result, default=json_serial))
 
 
@@ -149,8 +149,7 @@ def edit_task(id):
             cursor.execute(sql, params)
             cursor.execute(getSql, id)
             task = cursor.fetchone()
-            create_notification("task", id, "Task Updated", "A task has been updated. Please check the task for more details.\n\nTask Details:\nTitle: " + task['title'] + "\nDescription: " + task['description'])
-
+            create_notification("task", id, "update")
             return {"message": "Task updated successfully!"}
     except Exception as e:
         raise BadRequestError(str(e))
@@ -205,6 +204,8 @@ def set_task_assignees(id):
         cursor.execute(delete_sql, id)
         for assignee in assignees:
             cursor.execute(sql, (id, assignee))
+
+        create_notification("task", id, "assignee")
 
     return {"message": "Assignees added successfully!"}
 
