@@ -5,8 +5,7 @@ import os
 wsSession = session.Session()
 
 # Get from environment variables
-wsClient = wsSession.client('apigatewaymanagementapi', endpoint_url="https://" + os.environ.get('WS_API_ID') + ".execute-api." + os.environ.get('REGION') + ".amazonaws.com/api")
-print("https://" + os.environ.get('WS_API_ID') + ".execute-api." + os.environ.get('REGION') + ".amazonaws.com/api")
+wsClient = wsSession.client('apigatewaymanagementapi', endpoint_url="https://oetxtdnir0.execute-api.us-east-1.amazonaws.com/api")
 
 class Sender(object):
     """Class to send messages over websockets."""
