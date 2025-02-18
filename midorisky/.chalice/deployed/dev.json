@@ -3,7 +3,7 @@
     {
       "name": "managed-layer",
       "resource_type": "lambda_layer",
-      "layer_version_arn": "arn:aws:lambda:us-east-1:710271913812:layer:midorisky-dev-managed-layer:56"
+      "layer_version_arn": "arn:aws:lambda:us-east-1:710271913812:layer:midorisky-dev-managed-layer:57"
     },
     {
       "name": "check_spoilt_devices_role",
