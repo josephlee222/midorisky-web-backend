@@ -9,6 +9,7 @@
     "SQS_URL": "https://sqs.us-east-1.amazonaws.com/710271913812/midori-queue",
     "S3_BUCKET": "midori-bucket",
     "SSM_PREFIX": "/midori/",
+    "WS_API_ID": "oetxtdnir0",
     "IOT_ENDPOINT" : "a1sbg2z2gnyifu-ats.iot.us-east-1.amazonaws.com"
   },
   "automatic_layer": true,

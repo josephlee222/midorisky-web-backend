@@ -13,26 +13,24 @@ sqs = boto3.client('sqs')
 cognito_idp = boto3.client('cognito-idp')
 
 
-def create_notification(itemType, id, title, message, action=None):
+def create_notification(itemType, id, actionType):
     # Create SQS message
-    message = {
+    qMessage = {
         'type': itemType,
         'id': id,
-        'title': title,
-        'message': message,
-        'action': action
+        'action': actionType
     }
 
     # Send SQS message
     response = sqs.send_message(
         QueueUrl=os.environ.get('SQS_URL'),
-        MessageBody=json.dumps(message)
+        MessageBody=json.dumps(qMessage)
     )
 
 @notification_service.route('/notifications', methods=['GET'], cors=True, authorizer=login_authorizer)
 def get_notifications():
     username  = notification_service.current_request.context['authorizer']['principalId']
-    sql = "SELECT id, username, title, subtitle, action_url, action FROM Notifications WHERE username = %s AND is_read = false ORDER BY created_at DESC LIMIT 5"
+    sql = "SELECT id, username, title, subtitle, action_url, action FROM Notifications WHERE username = %s AND is_read = false ORDER BY created_at DESC"
 
     with create_connection().cursor() as cursor:
         cursor.execute(sql, (username))

@@ -1,3 +1,12 @@
+from boto3 import session
+from .connectHelper import create_connection
+import os
+
+wsSession = session.Session()
+
+# Get from environment variables
+wsClient = wsSession.client('apigatewaymanagementapi', endpoint_url="https://" + os.environ.get('WS_API_ID') + ".execute-api." + os.environ.get('REGION') + ".amazonaws.com/api")
+
 class Sender(object):
     """Class to send messages over websockets."""
     def __init__(self, app):
@@ -14,8 +23,12 @@ class Sender(object):
 
         :param message: The message to send to the connection.
         """
-
-        self._app.websocket_api.send(connection_id, message)
+        try:
+            wsClient.post_to_connection(ConnectionId=connection_id, Data=message)
+        except wsClient.exceptions.GoneException:
+            # If the connection is closed, remove the connection ID
+            with create_connection().cursor() as cursor:
+                cursor.execute("DELETE FROM wsConnections WHERE connection_id = %s", (connection_id))
 
 
     def broadcast(self, connection_ids, message):

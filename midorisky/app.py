@@ -53,8 +53,6 @@ def connect(event):
     return json.dumps({'message': 'Connected'})
 
 
-
-
 @app.on_ws_disconnect()
 def disconnect(event):
     with create_connection().cursor() as cursor:
@@ -71,6 +69,12 @@ def message(event):
     message = json.loads(event.body)
     connection_id = event.connection_id
 
+    if "type" in message:
+        if message['type'] == 'logout':
+            with create_connection().cursor() as cursor:
+                cursor.execute("DELETE FROM wsConnections WHERE connection_id = %s", (connection_id))
+        return
+
     if message['username']:
         # Store connection ID username association
         with create_connection().cursor() as cursor:
@@ -86,103 +90,156 @@ def insert_notification(username, title, subtitle, url, action="View"):
     with create_connection().cursor() as cursor:
         cursor.execute(sql, (username, title, subtitle, url, action))
         cursor.execute(connections_sql, (username))
-
         connections = cursor.fetchall()
 
-    #sender.broadcast(connections, json.dumps({'type': 'notification', 'title': title, 'subtitle': subtitle, 'action_url': url, 'action': action}))
+        # Get notification just created
+        cursor.execute("SELECT id, username, title, subtitle, action_url, action FROM Notifications WHERE username = %s ORDER BY created_at DESC LIMIT 1", (username))
+        notification = cursor.fetchone()
+
+
+    # put connections in a list
+    connections_list = [connection['connection_id'] for connection in connections]
+    sender.broadcast(connections_list, json.dumps({'id': notification['id'], 'type': 'notification', 'title': title, 'subtitle': subtitle, 'action_url': url, 'action': action}))
     return
 
 
 @app.on_sqs_message(queue='midori-queue', batch_size=5)
 def handle_sqs_message(event):
-    ses = boto3.client('ses')
-    sqs = boto3.client('sqs')
-    cognito_idp = boto3.client('cognito-idp')
+
     for record in event:
         # Parse the record
         data = json.loads(record.body)
         print(data)
 
         type = data['type']
-        id = data['id']
-        title = data['title']
-        message = data['message']
 
-        if type == 'task':
-            # query item by id
-            sql = "SELECT * FROM midori.Tasks WHERE id = %s"
+        if type == 'task' or type == 'assignee':
+            handleTaskType(data)
+        elif type == 'comment':
+            handleCommentType(data)
 
-            with create_connection().cursor() as cursor:
-                cursor.execute(sql, (id))
-                item = cursor.fetchone()
 
-                #print(json.dumps(item, default=json_serial))
+def handleCommentType(data):
+    ses = boto3.client('ses')
+    sqs = boto3.client('sqs')
+    cognito_idp = boto3.client('cognito-idp')
 
-                if item:
-                    taskId = item['id']
-                    # query notification subscribers based on categoryId
-                    sql = "SELECT * FROM midori.TasksAssignees WHERE taskId = %s"
+    id = data['id']
+    action = data['action']
 
-                    cursor.execute(sql, (taskId))
-                    assignees = cursor.fetchall()
+    # query item by id
+    sql = "SELECT * FROM TaskComments WHERE id = %s"
 
-                    emails = []
-                    if assignees:
-                        for assignee in assignees:
-                            # query user by username
-                            user = cognito_idp.admin_get_user(
-                                UserPoolId=os.environ.get('USER_POOL_ID'),
-                                Username=assignee['username']
-                            )
+    with create_connection().cursor() as cursor:
+        cursor.execute(sql, (id))
+        item = cursor.fetchone()
 
-                            insert_notification(assignee['username'], "Task Updated", "A task you are assigned to has been updated.", '/staff/tasks?task=' + str(taskId), "View")
+        if item:
+            taskId = item['taskId']
 
-                            for attribute in user['UserAttributes']:
-                                if attribute['Name'] == 'email':
-                                    emails.append(attribute['Value'])
-                                    break
+            # query task by taskId
+            sql = "SELECT * FROM Tasks WHERE id = %s"
+            cursor.execute(sql, (taskId))
+            task = cursor.fetchone()
 
-                        print(emails)
-                        # send email to users
-                        response = ses.send_email(
-                            Source=os.environ.get('SES_EMAIL'),
-                            Destination={
-                                'ToAddresses': emails
+            # query task assignees
+            sql = "SELECT * FROM TasksAssignees WHERE taskId = %s"
+            cursor.execute(sql, (taskId))
+            assignees = cursor.fetchall()
+            for assignee in assignees:
+                username = assignee['username']
+                insert_notification(username, task["title"] + " - New Task Comment", "A new comment has been added to a task you are assigned to:\n\n" + item['comment'], '/staff/tasks?task=' + str(taskId), "View Task")
+
+
+
+def handleTaskType(data):
+    ses = boto3.client('ses')
+    sqs = boto3.client('sqs')
+    cognito_idp = boto3.client('cognito-idp')
+
+
+    id = data['id']
+    action = data['action']
+
+    # query item by id
+    sql = "SELECT * FROM midori.Tasks WHERE id = %s"
+
+    with create_connection().cursor() as cursor:
+        cursor.execute(sql, (id))
+        item = cursor.fetchone()
+
+        # print(json.dumps(item, default=json_serial))
+
+        if item:
+            taskId = item['id']
+            # query notification subscribers based on categoryId
+            sql = "SELECT * FROM midori.TasksAssignees WHERE taskId = %s"
+
+            cursor.execute(sql, (taskId))
+            assignees = cursor.fetchall()
+
+            emailContent = {
+                'update': {
+                    'title': 'Task Updated',
+                    'message': "A task has been updated. Please check the task for more details.\n\nTask Details:\nTitle: " +
+                               item['title'] + "\nDescription: " + item['description']
+                },
+                'create': {
+                    'title': 'Task Created',
+                    'message': "A task has been created. Please check the task for more details.\n\nTask Details:\nTitle: " +
+                               item['title'] + "\nDescription: " + item['description']
+                },
+                'assignee': {
+                    'title': 'Task Assigned',
+                    'message': "You have been assigned to a task or its assignees has been changed. Please check the task for more details.\n\nTask Details:\nTitle: " +
+                               item['title'] + "\nDescription: " + item['description']
+                }
+            }
+
+            emails = []
+            if assignees:
+                for assignee in assignees:
+                    # query user by username
+                    user = cognito_idp.admin_get_user(
+                        UserPoolId=os.environ.get('USER_POOL_ID'),
+                        Username=assignee['username']
+                    )
+
+                    if action == 'create':
+                        insert_notification(assignee['username'], "Task Created", "A new task has been created:\n" + item['title'], '/staff/tasks?task=' + str(taskId), "View Task")
+                    elif action == 'update':
+                        insert_notification(assignee['username'], "Task Updated", "A task has been updated:\n" + item['title'], '/staff/tasks?task=' + str(taskId), "View Task")
+                    elif action == 'assignee':
+                        insert_notification(assignee['username'], "Task Assigned", "You have been assigned to a task or its assignees has been changed:\n" + item['title'], '/staff/tasks?task=' + str(taskId), "View Task")
+
+                    for attribute in user['UserAttributes']:
+                        if attribute['Name'] == 'email':
+                            emails.append(attribute['Value'])
+                            break
+
+                try:
+                    # send email to users
+                    response = ses.send_email(
+                        Source=os.environ.get('SES_EMAIL'),
+                        Destination={
+                            'ToAddresses': emails
+                        },
+                        Message={
+                            'Subject': {
+                                'Data': emailContent[action]['title']
                             },
-                            Message={
-                                'Subject': {
-                                    'Data': title
-                                },
-                                'Body': {
-                                    'Text': {
-                                        'Data': message
-                                    }
+                            'Body': {
+                                'Text': {
+                                    'Data': emailContent[action]['message']
                                 }
                             }
-                        )
-
-                        for email in emails:
-                            print('Email sent to: ' + email)
-                else:
-                    return
+                        }
+                    )
+                except Exception as e:
+                    print(e)
 
 
-# The view function above will return {"hello": "world"}
-# whenever you make an HTTP GET request to '/'.
-#
-# Here are a few more examples:
-#
-# @app.route('/hello/{name}')
-# def hello_name(name):
-#    # '/hello/james' -> {"hello": "james"}
-#    return {'hello': name}
-#
-# @app.route('/users', methods=['POST'])
-# def create_user():
-#     # This is the JSON body the user sent in their POST request.
-#     user_as_json = app.current_request.json_body
-#     # We'll echo the json body back to the user in a 'user' key.
-#     return {'user': user_as_json}
-#
-# See the README documentation for more examples.
-#
+                for email in emails:
+                    print('Email sent to: ' + email)
+        else:
+            return
