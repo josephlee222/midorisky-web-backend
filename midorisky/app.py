@@ -211,23 +211,27 @@ def handleTaskType(data):
                             emails.append(attribute['Value'])
                             break
 
-                # send email to users
-                response = ses.send_email(
-                    Source=os.environ.get('SES_EMAIL'),
-                    Destination={
-                        'ToAddresses': emails
-                    },
-                    Message={
-                        'Subject': {
-                            'Data': emailContent[action]['title']
+                try:
+                    # send email to users
+                    response = ses.send_email(
+                        Source=os.environ.get('SES_EMAIL'),
+                        Destination={
+                            'ToAddresses': emails
                         },
-                        'Body': {
-                            'Text': {
-                                'Data': emailContent[action]['message']
+                        Message={
+                            'Subject': {
+                                'Data': emailContent[action]['title']
+                            },
+                            'Body': {
+                                'Text': {
+                                    'Data': emailContent[action]['message']
+                                }
                             }
                         }
-                    }
-                )
+                    )
+                except Exception as e:
+                    print(e)
+
 
                 for email in emails:
                     print('Email sent to: ' + email)
