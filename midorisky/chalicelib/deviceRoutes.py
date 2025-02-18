@@ -47,54 +47,30 @@ def fetch_all_devices():
             status_code=500,
             headers={'Content-Type': 'application/json'}
         )
-    finally:
-        if connection:
-            connection.close()
 
-@device_routes.route('/staff/devices/create-device', methods=['POST'], cors=True)
-def create_device():
+@device_routes.route('/staff/devices/view/{device_id}', methods=['GET'], cors=True)
+def fetch_device(device_id):
     """
-    Create a new device and insert it into the IoTDevices table.
-    Expects a JSON body with 'IoTType', 'IoTSerialNumber', and 'PlotID'.
-    'IoTStatus' will automatically be set to 1 (active), and 'Timestamp' will be set to the current time.
+    Fetch a single IoT device by ID.
     """
+    query = """SELECT id, IoTType, IoTStatus, IoTSerialNumber, PlotID, LastDowntime 
+               FROM IoTDevicesTest WHERE id = %s"""
     try:
-        # Access the current request
-        data = device_routes.current_request.json_body
-        if not data:
-            raise BadRequestError("Invalid JSON payload.")
+        connection = create_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(query, (device_id,))
+            result = cursor.fetchone()
 
-        # Validate required fields
-        required_fields = ['IoTType', 'IoTSerialNumber', 'PlotID']
-        for field in required_fields:
-            if field not in data:
-                raise BadRequestError(f"Missing required field: {field}")
-
-        # Prepare the SQL query
-        query = """
-        INSERT INTO IoTDevicesTest (IoTType, IoTSerialNumber, IoTStatus, PlotID)
-        VALUES (%s, %s, 1, %s)
-        """
-
-        # Execute the query
-        with create_connection().cursor() as cursor:
-            cursor.execute(query, (
-                data['IoTType'],  # IoTType
-                data['IoTSerialNumber'],  # IoTSerialNumber
-                data['PlotID']  # PlotID
-            ))
-            create_connection().commit()
+        if not result:
+            return Response(
+                body=json.dumps({"error": "Device not found"}),
+                status_code=404,
+                headers={'Content-Type': 'application/json'}
+            )
 
         return Response(
-            body=json.dumps({"message": "Device created successfully"}),
-            status_code=201,
-            headers={'Content-Type': 'application/json'}
-        )
-
-    except BadRequestError as e:
-        return Response(
-            body=json.dumps({"error": str(e)}),
-            status_code=400,
+            body=json.dumps(result, default=json_serial),
+            status_code=200,
             headers={'Content-Type': 'application/json'}
         )
     except Exception as e:
@@ -104,37 +80,104 @@ def create_device():
             headers={'Content-Type': 'application/json'}
         )
 
-@device_routes.route('/staff/devices/delete-device', methods=['DELETE'], cors=True)
-def delete_device():
+@device_routes.route('/staff/devices/create', methods=['POST'], cors=True)
+def create_device():
     """
-    Delete a device by ID provided in the query parameters.
+    Create a new IoT device.
     """
     try:
-        # Retrieve `device_id` from query parameters
-        device_id = device_routes.current_request.query_params.get('id')
-        if not device_id:
-            raise BadRequestError("Device ID is required.")
+        request = device_routes.current_request.json_body
+        IoTType = request.get("IoTType")
+        IoTStatus = request.get("IoTStatus")
+        IoTSerialNumber = request.get("IoTSerialNumber")
+        PlotID = request.get("PlotID")
 
-        # SQL deletion query
-        query = """
-        DELETE FROM IoTDevicesTest
-        WHERE id = %s
-        """
+        if IoTType is None or IoTStatus is None or IoTSerialNumber is None or PlotID is None:
+            raise BadRequestError("Missing required fields")
 
-        with create_connection().cursor() as cursor:
-            cursor.execute(query, (device_id,))
-            create_connection().commit()
+        query = """INSERT INTO IoTDevicesTest (IoTType, IoTStatus, IoTSerialNumber, PlotID, LastDowntime) 
+                   VALUES (%s, %s, %s, %s, NOW())"""
+        log_query = """INSERT INTO IoTDeviceLogTest (IoTType, IoTStatus, IoTSerialNumber, PlotID, Timestamp, ChangedBy) 
+                        VALUES (%s, %s, %s, %s, NOW(), 'admin')"""
+
+        connection = create_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(query, (IoTType, IoTStatus, IoTSerialNumber, PlotID))
+            cursor.execute(log_query, (IoTType, IoTStatus, IoTSerialNumber, PlotID))
+            connection.commit()
+
+        return Response(
+            body=json.dumps({"message": "Device created successfully"}),
+            status_code=201,
+            headers={'Content-Type': 'application/json'}
+        )
+    except Exception as e:
+        return Response(
+            body=json.dumps({"error": str(e)}),
+            status_code=500,
+            headers={'Content-Type': 'application/json'}
+        )
+
+@device_routes.route('/staff/devices/edit/{device_id}', methods=['PUT'], cors=True)
+def edit_device(device_id):
+    """
+    Edit an existing IoT device.
+    """
+    try:
+        request = device_routes.current_request.json_body
+        print(device_routes.current_request.json_body)
+        print(device_routes.current_request)
+        IoTType = request.get("IoTType")
+        IoTStatus = request.get("IoTStatus")
+        IoTSerialNumber = request.get("IoTSerialNumber")
+        PlotID = request.get("PlotID")
+        print(IoTType, IoTStatus, IoTSerialNumber, PlotID)
+        if IoTType is None or IoTStatus is None or IoTSerialNumber is None or PlotID is None:
+            raise BadRequestError("Missing required fields")
+
+        query = """UPDATE IoTDevicesTest SET IoTType=%s, IoTStatus=%s, IoTSerialNumber=%s, PlotID=%s 
+                   WHERE id=%s"""
+        log_query = """INSERT INTO IoTDeviceLogTest (IoTType, IoTStatus, IoTSerialNumber, PlotID, Timestamp, ChangedBy) 
+                        VALUES (%s, %s, %s, %s, NOW(), 'admin')"""
+
+        connection = create_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(query, (IoTType, IoTStatus, IoTSerialNumber, PlotID, device_id))
+            cursor.execute(log_query, (IoTType, IoTStatus, IoTSerialNumber, PlotID))
+            connection.commit()
+
+        return Response(
+            body=json.dumps({"message": "Device updated successfully"}),
+            status_code=200,
+            headers={'Content-Type': 'application/json'}
+        )
+    except Exception as e:
+        return Response(
+            body=json.dumps({"error": str(e)}),
+            status_code=500,
+            headers={'Content-Type': 'application/json'}
+        )
+
+
+@device_routes.route('/staff/devices/delete/{device_id}', methods=['DELETE'], cors=True)
+def delete_device(device_id):
+    """
+    Delete an IoT device by ID.
+    """
+    try:
+        log_query = """INSERT INTO IoTDeviceLogTest (IoTType, IoTStatus, IoTSerialNumber, PlotID, Timestamp, ChangedBy) 
+                        SELECT IoTType, IoTStatus, IoTSerialNumber, PlotID, NOW(), 'admin' FROM IoTDevicesTest WHERE id = %s"""
+        delete_query = "DELETE FROM IoTDevicesTest WHERE id = %s"
+
+        connection = create_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(log_query, (device_id,))
+            cursor.execute(delete_query, (device_id,))
+            connection.commit()
 
         return Response(
             body=json.dumps({"message": "Device deleted successfully"}),
             status_code=200,
-            headers={'Content-Type': 'application/json'}
-        )
-
-    except BadRequestError as e:
-        return Response(
-            body=json.dumps({"error": str(e)}),
-            status_code=400,
             headers={'Content-Type': 'application/json'}
         )
     except Exception as e:
@@ -156,7 +199,7 @@ iot_client = boto3.client(
 SGT_OFFSET = datetime.timedelta(hours=8)
 
 # Constants for Downtime Management
-DOWNTIME_PROBABILITY = 3  # 10% chance for a device to go inactive
+DOWNTIME_PROBABILITY = 0.2  # 10% chance for a device to go inactive
 DOWNTIME_COOLDOWN_DAYS = 40
 
 def get_latest_30min_timestamp():
