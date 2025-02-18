@@ -250,8 +250,10 @@ def update_task_status(id):
         result = cursor.fetchone()
 
         if not result:
-            return ForbiddenError("You are not authorized to update the status of this task")
+            raise ForbiddenError("You are not authorized to update the status of this task")
         cursor.execute(sql, (status, id))
+
+        create_notification("task", id, "update")
         return {"message": "Task status updated successfully!"}
 
 
