@@ -42,7 +42,7 @@ def create_task():
 
 
 # Get all tasks from the database
-@task_routes.route('/tasks/list/{display}', authorizer=farm_manager_authorizer, cors=True)
+@task_routes.route('/tasks/list/{display}', authorizer=farmer_authorizer, cors=True)
 def get_all_tasks(display):
     sql = ""
     if display == 'my':
@@ -88,7 +88,7 @@ def get_all_tasks(display):
             cursor.execute(sql)
 
         result = cursor.fetchall()
-        return json.loads(json.dumps(result, default=str))
+        return json.loads(json.dumps(result, default=json_serial))
 
 
 @task_routes.route('/tasks/{id}/comments', authorizer=farmer_authorizer, cors=True)
@@ -170,7 +170,7 @@ def get_task(id):
         cursor.execute(assignee_sql, id)
         assigneeResult = cursor.fetchall()
 
-        return json.loads(json.dumps({'task': taskResult, 'assignees': assigneeResult}, default=str))
+        return json.loads(json.dumps({'task': taskResult, 'assignees': assigneeResult}, default=json_serial))
 
 
 @task_routes.route('/tasks/{id}', authorizer=farm_manager_authorizer, cors=True, methods=['DELETE'])
@@ -225,6 +225,13 @@ def edit_task(id):
     except Exception as e:
         raise BadRequestError(str(e))
 
+@task_routes.route('/tasks/{id}/hide', authorizer=farm_manager_authorizer, cors=True, methods=['GET'])
+def hide_task(id):
+    sql = "UPDATE Tasks SET hidden = 1 WHERE id = %s"
+
+    with create_connection().cursor() as cursor:
+        cursor.execute(sql, id)
+        return {"message": "Task hidden successfully!"}
 
 @task_routes.route('/tasks/{id}/status', authorizer=farmer_authorizer, cors=True, methods=['PUT'])
 def update_task_status(id):

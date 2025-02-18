@@ -69,6 +69,12 @@ def message(event):
     message = json.loads(event.body)
     connection_id = event.connection_id
 
+    if "type" in message:
+        if message['type'] == 'logout':
+            with create_connection().cursor() as cursor:
+                cursor.execute("DELETE FROM wsConnections WHERE connection_id = %s", (connection_id))
+        return
+
     if message['username']:
         # Store connection ID username association
         with create_connection().cursor() as cursor:
