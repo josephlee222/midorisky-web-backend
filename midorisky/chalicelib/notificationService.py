@@ -6,6 +6,7 @@ from .authorizers import login_authorizer
 from .helpers import json_serial
 from .wsService import Sender
 import boto3
+from chalice.app import Rate
 
 notification_service = Blueprint(__name__)
 ses = boto3.client('ses')
@@ -55,4 +56,42 @@ def read_notification(id):
 
     with create_connection().cursor() as cursor:
         cursor.execute(sql, (id, username))
+        return
+
+
+@notification_service.schedule(Rate(2, unit=Rate.HOURS))
+def check_spoilt_devices(event):
+    # Count devices that have been spoilt for more than 2 hours
+
+    query = """
+    SELECT id
+    FROM IoTDevicesTest
+    WHERE IoTStatus = 0 AND TIMESTAMPDIFF(HOUR, LastDowntime, NOW()) >= 2
+    """
+
+    try:
+        connection = create_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            result = cursor.fetchall()
+
+            # Count the number of spoilt devices
+            spoilt_count = len(result)
+
+            if spoilt_count > 0:
+                qMessage = {
+                    'type': "device",
+                    'count': spoilt_count
+                }
+
+                print(qMessage)
+
+                # Send SQS message
+                response = sqs.send_message(
+                    QueueUrl=os.environ.get('SQS_URL'),
+                    MessageBody=json.dumps(qMessage)
+                )
+        return
+    except Exception as e:
+        print(e)
         return
