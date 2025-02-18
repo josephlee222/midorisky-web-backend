@@ -48,13 +48,18 @@ def fetch_all_devices():
             headers={'Content-Type': 'application/json'}
         )
 
+
 @device_routes.route('/staff/devices/view/{device_id}', methods=['GET'], cors=True)
 def fetch_device(device_id):
     """
-    Fetch a single IoT device by ID.
+    Fetch the latest log entry for a single IoT device by its serial number.
     """
-    query = """SELECT id, IoTType, IoTStatus, IoTSerialNumber, PlotID, LastDowntime 
-               FROM IoTDevicesTest WHERE id = %s"""
+    query = """
+    SELECT id, IoTType, IoTStatus, IoTSerialNumber, PlotID, Timestamp, ChangedBy 
+    FROM IoTDeviceLogTest 
+    WHERE IoTSerialNumber = (SELECT IoTSerialNumber FROM IoTDevicesTest WHERE id = %s) 
+    ORDER BY Timestamp DESC 
+    LIMIT 1"""
     try:
         connection = create_connection()
         with connection.cursor() as cursor:
@@ -63,7 +68,7 @@ def fetch_device(device_id):
 
         if not result:
             return Response(
-                body=json.dumps({"error": "Device not found"}),
+                body=json.dumps({"error": "Device log not found"}),
                 status_code=404,
                 headers={'Content-Type': 'application/json'}
             )
@@ -98,7 +103,7 @@ def create_device():
         query = """INSERT INTO IoTDevicesTest (IoTType, IoTStatus, IoTSerialNumber, PlotID, LastDowntime) 
                    VALUES (%s, %s, %s, %s, NOW())"""
         log_query = """INSERT INTO IoTDeviceLogTest (IoTType, IoTStatus, IoTSerialNumber, PlotID, Timestamp, ChangedBy) 
-                        VALUES (%s, %s, %s, %s, NOW(), 'admin')"""
+                        VALUES (%s, %s, %s, %s, NOW(), 'Admin')"""
 
         connection = create_connection()
         with connection.cursor() as cursor:
