@@ -21,6 +21,8 @@ def create_notification(itemType, id, actionType):
         'action': actionType
     }
 
+    print(qMessage)
+
     # Send SQS message
     response = sqs.send_message(
         QueueUrl=os.environ.get('SQS_URL'),

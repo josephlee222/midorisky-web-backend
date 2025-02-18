@@ -37,7 +37,7 @@ def create_task():
         # assign the creator to the task
         cursor.execute(assigneeSql, (cursor.lastrowid, task_routes.current_request.context['authorizer']['principalId']))
 
-        create_notification("task", id, "create")
+        create_notification("task", result["id"], "create")
         return json.loads(json.dumps(result, default=json_serial))
 
 

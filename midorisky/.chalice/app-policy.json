@@ -57,6 +57,12 @@
         "Action": "execute-api:*",
         "Effect": "Allow",
         "Resource": "*"
+    },
+    {
+        "Sid": "Stmt1746093014112",
+        "Action": "iot:*",
+        "Effect": "Allow",
+        "Resource": "*"
     }
   ]
 }
