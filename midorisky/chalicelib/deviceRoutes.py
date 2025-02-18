@@ -156,7 +156,7 @@ iot_client = boto3.client(
 SGT_OFFSET = datetime.timedelta(hours=8)
 
 # Constants for Downtime Management
-DOWNTIME_PROBABILITY = 10  # 10% chance for a device to go inactive
+DOWNTIME_PROBABILITY = 3  # 10% chance for a device to go inactive
 DOWNTIME_COOLDOWN_DAYS = 40
 
 def get_latest_30min_timestamp():
