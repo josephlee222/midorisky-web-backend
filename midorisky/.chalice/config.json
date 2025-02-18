@@ -8,7 +8,8 @@
     "SES_EMAIL": "midorisky@cat2.link",
     "SQS_URL": "https://sqs.us-east-1.amazonaws.com/710271913812/midori-queue",
     "S3_BUCKET": "midori-bucket",
-    "SSM_PREFIX": "/midori/"
+    "SSM_PREFIX": "/midori/",
+    "IOT_ENDPOINT" : "a1sbg2z2gnyifu-ats.iot.us-east-1.amazonaws.com"
   },
   "automatic_layer": true,
   "lambda_memory_size": 512,

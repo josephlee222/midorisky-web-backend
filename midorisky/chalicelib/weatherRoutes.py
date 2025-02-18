@@ -10,19 +10,6 @@ weather_routes = Blueprint(__name__)
 
 s3 = boto3.client('s3')
 
-# def format_daily_data(result, columns):
-#     """
-#     Format daily data from the database result.
-#     """
-#     data = []
-#     for row in result:
-#         row_dict = dict(zip(columns, row))
-#         # convert string to datetime object (2019-01-01 00:00:00.000000)
-#         #print(row['timestamp'])
-#         row_dict['timestamp'] = row['timestamp']
-#         data.append(row_dict)
-#     return data
-
 @weather_routes.route('/staff/weather/fetch-weather-data', methods=['GET'], cors=True)
 def fetch_weather_data():
     """
@@ -30,7 +17,7 @@ def fetch_weather_data():
     """
     query = """
     SELECT timestamp, temperature, humidity, precipitation, windspeed 
-    FROM WeatherSensor 
+    FROM WeatherData 
     WHERE timestamp BETWEEN '2019-01-01' AND CURDATE();
     """
     try:
@@ -115,9 +102,15 @@ def fetch_combined_weather_data():
     Fetch combined daily weather data (actual and predicted) and return JSON for frontend consumption.
     """
     sensor_query = """
-    SELECT timestamp, temperature, humidity, precipitation, windspeed 
-    FROM WeatherSensor 
-    WHERE timestamp BETWEEN '2019-01-01' AND CURDATE();
+    SELECT 
+        DATE(timestamp) as Date, 
+        AVG(temperature) as Temperature, 
+        AVG(humidity) as Humidity, 
+        AVG(precipitation) as Precipitation, 
+        AVG(windspeed) as Windspeed
+    FROM WeatherData 
+    WHERE timestamp BETWEEN '2019-01-01' AND CURDATE()
+    GROUP BY DATE(timestamp);
     """
     prediction_query = """
     SELECT Date, Temperature, Humidity, Precipitation, Windspeed 
@@ -125,13 +118,13 @@ def fetch_combined_weather_data():
     WHERE Date > CURDATE();
     """
     try:
-        # Fetch data from WeatherSensor
+        # Fetch data from WeatherData
         with create_connection().cursor() as cursor:
             cursor.execute(sensor_query)
             sensor_result = cursor.fetchall()
 
         if not sensor_result:
-            raise BadRequestError("No data found for the WeatherSensor table.")
+            raise BadRequestError("No data found for the WeatherData table.")
 
         # Fetch data from WeatherPrediction
         with create_connection().cursor() as cursor:
@@ -140,10 +133,6 @@ def fetch_combined_weather_data():
 
         if not prediction_result:
             raise BadRequestError("No data found for the WeatherPrediction table.")
-
-        # Format the data
-        sensor_columns = ['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed']
-        prediction_columns = ['Date', 'Temperature', 'Humidity', 'Precipitation', 'Windspeed']
 
         sensor_data = sensor_result
         prediction_data = prediction_result
@@ -181,31 +170,26 @@ def fetch_combined_weather_data():
 @weather_routes.route('/staff/weather/fetch-closest-weather-data', methods=['GET'], cors=True)
 def fetch_closest_weather_data():
     """
-    Fetch the closest weather data (to the current time) from WeatherSensor and return JSON.
+    Fetch the closest weather data (to the current time) from WeatherData and return JSON.
     """
     sensor_query = """
     SELECT CONVERT_TZ(timestamp, '+00:00', '+08:00') AS timestamp, temperature, humidity, precipitation, windspeed 
-    FROM WeatherSensor 
+    FROM WeatherData 
     WHERE timestamp BETWEEN DATE_SUB(NOW(), INTERVAL 1 DAY) AND NOW()
     ORDER BY ABS(TIMESTAMPDIFF(SECOND, timestamp, NOW())) ASC
     LIMIT 1;
     """
     try:
-        # Fetch closest data from WeatherSensor
+        # Fetch closest data from WeatherData
         with create_connection().cursor() as cursor:
             cursor.execute(sensor_query)
             sensor_result = cursor.fetchone()
 
         if not sensor_result:
-            raise Exception("No recent data found in the WeatherSensor table.")
-
-        # Format the data
-        columns = ['timestamp', 'temperature', 'humidity', 'precipitation', 'windspeed']
-        sensor_data = dict(zip(columns, sensor_result))
-        sensor_data['timestamp'] = sensor_data['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+            raise Exception("No recent data found in the WeatherData table.")
 
         return Response(
-            body=json.dumps([sensor_data], default=json_serial),
+            body=json.dumps([sensor_result], default=json_serial),
             status_code=200,
             headers={'Content-Type': 'application/json'}
         )
@@ -229,7 +213,7 @@ def fetch_current_and_next_days_weather():
            AVG(humidity) AS humidity, 
            SUM(precipitation) AS precipitation, 
            AVG(windspeed) AS windspeed 
-    FROM WeatherSensor 
+    FROM WeatherData 
     WHERE DATE(CONVERT_TZ(timestamp, '+00:00', '+08:00')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+08:00'))
     GROUP BY DATE(CONVERT_TZ(timestamp, '+00:00', '+08:00'));
     """
@@ -249,13 +233,13 @@ def fetch_current_and_next_days_weather():
     """
 
     try:
-        # Fetch current day's data from WeatherSensor
+        # Fetch current day's data from WeatherData
         with create_connection().cursor() as cursor:
             cursor.execute(current_day_query)
             current_day_result = cursor.fetchall()
 
         if not current_day_result:
-            raise Exception("No data found for the current day in the WeatherSensor table.")
+            raise Exception("No data found for the current day in the WeatherData table.")
 
         # Fetch next 3 days' predicted data from WeatherPrediction
         with create_connection().cursor() as cursor:
@@ -288,16 +272,16 @@ def fetch_current_and_next_days_weather():
 @weather_routes.route('/staff/weather/fetch-current-and-next-hours', methods=['GET'], cors=True)
 def fetch_current_and_next_hours_weather():
     """
-    Fetch the weather data for the current 2 hours (from WeatherSensor) and the next 2 hours (from WeatherPrediction24).
+    Fetch the weather data for the current 2 hours (from WeatherData) and the next 2 hours (from WeatherPrediction24).
     """
-    # Query for the current 2 hours' weather data from WeatherSensor
+    # Query for the current 2 hours' weather data from WeatherData
     current_hours_query = """
     SELECT CONVERT_TZ(Timestamp, '+00:00', '+08:00') AS Timestamp, 
            AVG(Temperature) AS Temperature, 
            AVG(Humidity) AS Humidity, 
            SUM(Precipitation) AS Precipitation, 
            AVG(Windspeed) AS Windspeed 
-    FROM WeatherSensor 
+    FROM WeatherData 
     WHERE Timestamp >= DATE_SUB(NOW(), INTERVAL 2 HOUR) 
       AND Timestamp <= NOW()
     GROUP BY FLOOR(UNIX_TIMESTAMP(Timestamp) / 1800)  -- Group by 30-minute intervals
@@ -319,13 +303,13 @@ def fetch_current_and_next_hours_weather():
     """
 
     try:
-        # Fetch current 2 hours' data from WeatherSensor
+        # Fetch current 2 hours' data from WeatherData
         with create_connection().cursor() as cursor:
             cursor.execute(current_hours_query)
             current_hours_result = cursor.fetchall()
 
         if not current_hours_result:
-            raise Exception("No data found for the current 2 hours in the WeatherSensor table.")
+            raise Exception("No data found for the current 2 hours in the WeatherData table.")
 
         # Fetch next 2 hours' predicted data from WeatherPrediction24
         with create_connection().cursor() as cursor:
