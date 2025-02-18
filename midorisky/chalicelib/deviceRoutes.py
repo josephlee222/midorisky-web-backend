@@ -208,7 +208,7 @@ def get_latest_30min_timestamp():
     rounded_minute = (now.minute // 30) * 30
     return now.replace(minute=rounded_minute, second=0, microsecond=0)
 
-@app.schedule(Rate(30, unit=Rate.MINUTES))
+@device_routes.schedule(Rate(30, unit=Rate.MINUTES))
 def scheduled_iot_status_update(event):
     """Scheduled event to update IoT device statuses based on probability and cooldown."""
     print("Running scheduled IoT status update...")

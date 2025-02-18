@@ -3,7 +3,39 @@
     {
       "name": "managed-layer",
       "resource_type": "lambda_layer",
-      "layer_version_arn": "arn:aws:lambda:us-east-1:710271913812:layer:midorisky-dev-managed-layer:53"
+      "layer_version_arn": "arn:aws:lambda:us-east-1:710271913812:layer:midorisky-dev-managed-layer:56"
+    },
+    {
+      "name": "check_spoilt_devices_role",
+      "resource_type": "iam_role",
+      "role_arn": "arn:aws:iam::710271913812:role/midorisky-dev-check_spoilt_devices",
+      "role_name": "midorisky-dev-check_spoilt_devices"
+    },
+    {
+      "name": "check_spoilt_devices",
+      "resource_type": "lambda_function",
+      "lambda_arn": "arn:aws:lambda:us-east-1:710271913812:function:midorisky-dev-check_spoilt_devices"
+    },
+    {
+      "name": "check_spoilt_devices-event",
+      "resource_type": "cloudwatch_event",
+      "rule_name": "midorisky-dev-check_spoilt_devices-event"
+    },
+    {
+      "name": "scheduled_iot_status_update_role",
+      "resource_type": "iam_role",
+      "role_arn": "arn:aws:iam::710271913812:role/midorisky-dev-scheduled_iot_status_update",
+      "role_name": "midorisky-dev-scheduled_iot_status_update"
+    },
+    {
+      "name": "scheduled_iot_status_update",
+      "resource_type": "lambda_function",
+      "lambda_arn": "arn:aws:lambda:us-east-1:710271913812:function:midorisky-dev-scheduled_iot_status_update"
+    },
+    {
+      "name": "scheduled_iot_status_update-event",
+      "resource_type": "cloudwatch_event",
+      "rule_name": "midorisky-dev-scheduled_iot_status_update-event"
     },
     {
       "name": "handle_sqs_message_role",
