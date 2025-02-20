@@ -117,7 +117,56 @@ def handle_sqs_message(event):
             handleTaskType(data)
         elif type == 'comment':
             handleCommentType(data)
+        elif type == 'device':
+            handleDeviceType(data)
 
+
+def handleDeviceType(data):
+    ses = boto3.client('ses')
+    sqs = boto3.client('sqs')
+    cognito_idp = boto3.client('cognito-idp')
+
+    count = data['count']
+
+    admin_result = cognito_idp.list_users_in_group(
+        UserPoolId=os.environ.get('USER_POOL_ID'),
+        GroupName='Admin'
+    )
+
+    admin_emails = []
+    admin_username = []
+    for user in admin_result['Users']:
+        admin_username.append(user['Username'])
+
+        for attribute in user['Attributes']:
+            if attribute['Name'] == 'email':
+                admin_emails.append(attribute['Value'])
+                break
+
+
+    for username in admin_username:
+        insert_notification(username, "Device Spoiler Alert", "There are " + str(count) + " devices that have been spoilt for more than 2 hours.", '/staff/devices', "View Devices")
+
+    try:
+        # send email to users
+        response = ses.send_email(
+            Source=os.environ.get('SES_EMAIL'),
+            Destination={
+                'ToAddresses': admin_emails
+            },
+            Message={
+                'Subject': {
+                    'Data': 'Device Spoiler Alert'
+                },
+                'Body': {
+                    'Text': {
+                        'Data': 'There are ' + str(count) + ' devices that have been spoilt for more than 2 hours.'
+                    }
+                }
+            }
+        )
+    except Exception as e:
+        print(e)
 
 def handleCommentType(data):
     ses = boto3.client('ses')

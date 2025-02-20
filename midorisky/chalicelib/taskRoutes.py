@@ -37,7 +37,7 @@ def create_task():
         # assign the creator to the task
         cursor.execute(assigneeSql, (cursor.lastrowid, task_routes.current_request.context['authorizer']['principalId']))
 
-        create_notification("task", id, "create")
+        create_notification("task", result["id"], "create")
         return json.loads(json.dumps(result, default=json_serial))
 
 
@@ -250,8 +250,10 @@ def update_task_status(id):
         result = cursor.fetchone()
 
         if not result:
-            return ForbiddenError("You are not authorized to update the status of this task")
+            raise ForbiddenError("You are not authorized to update the status of this task")
         cursor.execute(sql, (status, id))
+
+        create_notification("task", id, "update")
         return {"message": "Task status updated successfully!"}
 
 
