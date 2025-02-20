@@ -8,18 +8,19 @@ create table Farms
     lon         decimal(9, 6) null
 );
 
-create table IoT
+create table IoTDeviceLogTest
 (
     id              int auto_increment
         primary key,
-    IoTType         varchar(50) not null,
-    IoTSerialNumber varchar(20) not null,
-    IoTStatus       tinyint     not null,
-    Timestamp       datetime(6) not null,
-    PlotID          varchar(10) not null
+    IoTType         varchar(50)  null,
+    IoTSerialNumber varchar(20)  null,
+    IoTStatus       tinyint      null,
+    Timestamp       datetime(6)  null,
+    PlotID          varchar(10)  null,
+    ChangedBy       varchar(100) null
 );
 
-create table IoTDevice
+create table IoTDeviceLogs
 (
     id              int auto_increment
         primary key,
@@ -35,9 +36,25 @@ create table IoTDevices
     id              int auto_increment
         primary key,
     IoTType         varchar(50) null,
-    IoTSerialNumber varchar(20) null,
+    IoTSerialNumber varchar(20) not null,
     IoTStatus       tinyint     null,
-    PlotID          varchar(10) null
+    PlotID          varchar(10) null,
+    constraint IoTSerialNumber
+        unique (IoTSerialNumber)
+);
+
+create table IoTDevicesTest
+(
+    id              int auto_increment
+        primary key,
+    IoTType         varchar(50)                        null,
+    IoTStatus       tinyint                            null,
+    IoTSerialNumber varchar(20)                        null,
+    PlotID          varchar(10)                        null,
+    LastDowntime    datetime                           null,
+    LastUpdated     datetime default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    constraint IoTSerialNumber
+        unique (IoTSerialNumber)
 );
 
 create table Notifications
@@ -78,6 +95,19 @@ create table Tasks
     status      int      default 1                 null,
     priority    int      default 3                 null,
     hidden      bit      default b'0'              null
+);
+
+create table TaskComments
+(
+    id         int auto_increment
+        primary key,
+    comment    text                                   null,
+    username   varchar(128) default 'admin'           null,
+    taskId     int                                    null,
+    created_at datetime     default CURRENT_TIMESTAMP null,
+    constraint task_comments_Tasks_id_fk
+        foreign key (taskId) references Tasks (id)
+            on delete cascade
 );
 
 create table TasksAssignees
@@ -143,16 +173,8 @@ create table WeatherPrediction24
     UID           varchar(36) not null
 );
 
-create table WeatherSensor
-(
-    id            int auto_increment
-        primary key,
-    Timestamp     datetime(6) not null,
-    Windspeed     double      not null,
-    Temperature   double      not null,
-    Precipitation double      not null,
-    Humidity      double      not null
-);
+create index idx_datetime
+    on WeatherPrediction24 (DateTime);
 
 create table taskAttachments
 (
